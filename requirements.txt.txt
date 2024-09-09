@@ -1,0 +1,7 @@
+# requirements.txt
+"""
+Required packages for the project
+"""
+
+# No external dependencies needed for this basic implementation
+# You might add packages like pytest for testing, or Flask/Django for web functionality

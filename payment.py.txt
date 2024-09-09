@@ -1,0 +1,16 @@
+# models/payment.py
+"""
+Payment class
+"""
+
+class Payment:
+    def __init__(self, paymentId: int, appointmentId: int, amount: float, method: str, status: str):
+        self.paymentId = paymentId
+        self.appointmentId = appointmentId
+        self.amount = amount
+        self.method = method
+        self.status = status
+    
+    def makePayment(self):
+        """Process payment"""
+        pass

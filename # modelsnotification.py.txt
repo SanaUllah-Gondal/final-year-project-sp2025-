@@ -1,0 +1,14 @@
+# models/notification.py
+"""
+Notification class
+"""
+
+class Notification:
+    def __init__(self, notificationId: int, userId: int, message: str):
+        self.notificationId = notificationId
+        self.userId = userId
+        self.message = message
+    
+    def sendNotification(self):
+        """Send notification to user"""
+        pass

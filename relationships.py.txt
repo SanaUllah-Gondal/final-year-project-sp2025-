@@ -1,0 +1,26 @@
+# utils/relationships.py
+"""
+Relationships between classes as shown in the diagram
+"""
+
+# This file would contain code to establish relationships between classes
+# For example, creating associations between users and their dashboards,
+# appointments and notifications, etc.
+
+def create_user_dashboard_relationship(user, dashboard):
+    """Create relationship between user and dashboard"""
+    if isinstance(user, Customer):
+        return CustomerDashboard(user)
+    elif isinstance(user, Plumber):
+        return PlumberDashboard(user)
+    elif isinstance(user, Cleaner):
+        return CleanerDashboard(user)
+    elif isinstance(user, Electrician):
+        return ElectricianDashboard(user)
+    else:
+        return None
+
+def create_appointment_notification_relationship(appointment, notification):
+    """Create relationship between appointment and notification"""
+    # Implementation would depend on specific business logic
+    pass

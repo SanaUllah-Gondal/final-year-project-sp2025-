@@ -1,0 +1,20 @@
+# main.py
+"""
+Main entry point for the service booking application
+"""
+
+from models.user import User, Admin, Customer, Plumber, Cleaner, Electrician
+from models.auth import OTP, UserSignup, UserLogin
+from models.dashboard import CustomerDashboard, PlumberDashboard, CleanerDashboard, ElectricianDashboard
+from models.appointment import PlumberAppointment, ElectricianAppointment, CleanerAppointment
+from models.notification import Notification
+from models.chat import Chat
+from models.payment import Payment
+
+def main():
+    print("Service Booking System Started")
+    # Example usage
+    # This would be expanded based on actual application needs
+    
+if __name__ == "__main__":
+    main()

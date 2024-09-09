@@ -1,0 +1,11 @@
+# models/chat.py
+"""
+Chat class
+"""
+
+class Chat:
+    def __init__(self, chatId: int, senderId: int, receiverId: int, message: str):
+        self.chatId = chatId
+        self.senderId = senderId
+        self.receiverId = receiverId
+        self.message = message

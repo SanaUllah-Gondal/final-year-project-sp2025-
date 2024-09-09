@@ -1,0 +1,55 @@
+# models/appointment.py
+"""
+Appointment classes for different service types
+"""
+
+class PlumberAppointment:
+    def __init__(self, appointmentId: int, userId: int, plumberId: int, type: str, description: str, status: str):
+        self.appointmentId = appointmentId
+        self.userId = userId
+        self.plumberId = plumberId
+        self.type = type
+        self.description = description
+        self.status = status
+    
+    def createAppointment(self):
+        """Create a new appointment"""
+        pass
+    
+    def updateStatus(self):
+        """Update appointment status"""
+        pass
+
+class ElectricianAppointment:
+    def __init__(self, appointmentId: int, userId: int, plumberId: int, type: str, description: str, status: str):
+        self.appointmentId = appointmentId
+        self.userId = userId
+        self.plumberId = plumberId
+        self.type = type
+        self.description = description
+        self.status = status
+    
+    def createAppointment(self):
+        """Create a new appointment"""
+        pass
+    
+    def updateStatus(self):
+        """Update appointment status"""
+        pass
+
+class CleanerAppointment:
+    def __init__(self, appointmentId: int, userId: int, plumberId: int, type: str, description: str, status: str):
+        self.appointmentId = appointmentId
+        self.userId = userId
+        self.plumberId = plumberId
+        self.type = type
+        self.description = description
+        self.status = status
+    
+    def createAppointment(self):
+        """Create a new appointment"""
+        pass
+    
+    def updateStatus(self):
+        """Update appointment status"""
+        pass

@@ -1,0 +1,64 @@
+# models/dashboard.py
+"""
+Dashboard classes for different user roles
+"""
+
+class CustomerDashboard:
+    def __init__(self, customer: 'Customer'):
+        self.customer = customer
+    
+    def viewServices(self):
+        """View available services"""
+        pass
+    
+    def selectService(self):
+        """Select a service to book"""
+        pass
+
+class PlumberDashboard:
+    def __init__(self, plumber: 'Plumber'):
+        self.plumber = plumber
+    
+    def viewRequests(self):
+        """View service requests"""
+        pass
+    
+    def acceptRequest(self):
+        """Accept a service request"""
+        pass
+    
+    def completeJob(self):
+        """Mark job as completed"""
+        pass
+
+class CleanerDashboard:
+    def __init__(self, cleaner: 'Cleaner'):
+        self.cleaner = cleaner
+    
+    def viewRequests(self):
+        """View service requests"""
+        pass
+    
+    def acceptRequest(self):
+        """Accept a service request"""
+        pass
+    
+    def completeJob(self):
+        """Mark job as completed"""
+        pass
+
+class ElectricianDashboard:
+    def __init__(self, electrician: 'Electrician'):
+        self.electrician = electrician
+    
+    def viewRequests(self):
+        """View service requests"""
+        pass
+    
+    def acceptRequest(self):
+        """Accept a service request"""
+        pass
+    
+    def completeJob(self):
+        """Mark job as completed"""
+        pass

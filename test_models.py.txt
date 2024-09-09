@@ -1,0 +1,39 @@
+# tests/test_models.py
+"""
+Unit tests for the models
+"""
+
+import unittest
+from models.user import User, Admin, Customer, Plumber, Cleaner, Electrician
+from models.auth import OTP, UserSignup, UserLogin
+from models.dashboard import CustomerDashboard, PlumberDashboard, CleanerDashboard, ElectricianDashboard
+from models.appointment import PlumberAppointment, ElectricianAppointment, CleanerAppointment
+from models.notification import Notification
+from models.chat import Chat
+from models.payment import Payment
+
+class TestUserModels(unittest.TestCase):
+    def test_user_creation(self):
+        user = User(1, "John Doe", "john@example.com", "1234567890", "123 Main St")
+        self.assertEqual(user.userId, 1)
+        self.assertEqual(user.name, "John Doe")
+    
+    def test_admin_creation(self):
+        admin = Admin(1, "Admin User", "admin@example.com", "1234567890", "456 Admin St")
+        self.assertEqual(admin.adminId, 1)
+        self.assertEqual(admin.name, "Admin User")
+
+class TestAuthModels(unittest.TestCase):
+    def test_otp_verification(self):
+        otp = OTP("user@example.com", "123456")
+        result = otp.verifyOTP()
+        self.assertTrue(result)
+
+class TestDashboardModels(unittest.TestCase):
+    def test_customer_dashboard(self):
+        customer = Customer(1, "John Doe", "john@example.com", "1234567890", "123 Main St")
+        dashboard = CustomerDashboard(customer)
+        self.assertIsInstance(dashboard, CustomerDashboard)
+
+if __name__ == '__main__':
+    unittest.main()

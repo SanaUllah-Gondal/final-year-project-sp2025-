@@ -1,0 +1,49 @@
+# models/user.py
+"""
+User-related classes including different user roles
+"""
+
+class User:
+    def __init__(self, userId: int, name: str, email: str, phone: str, address: str):
+        self.userId = userId
+        self.name = name
+        self.email = email
+        self.phone = phone
+        self.address = address
+    
+    def updateProfile(self):
+        """Update user profile information"""
+        pass
+
+class Admin(User):
+    def __init__(self, adminId: int, name: str, email: str, phone: str, address: str):
+        super().__init__(adminId, name, email, phone, address)
+        self.adminId = adminId
+    
+    def manageUsers(self):
+        """Manage users in the system"""
+        pass
+    
+    def viewReports(self):
+        """View system reports"""
+        pass
+    
+    def removeServiceProvider(self):
+        """Remove a service provider from the system"""
+        pass
+
+class Customer(User):
+    def __init__(self, userId: int, name: str, email: str, phone: str, address: str):
+        super().__init__(userId, name, email, phone, address)
+
+class Plumber(User):
+    def __init__(self, userId: int, name: str, email: str, phone: str, address: str):
+        super().__init__(userId, name, email, phone, address)
+
+class Cleaner(User):
+    def __init__(self, userId: int, name: str, email: str, phone: str, address: str):
+        super().__init__(userId, name, email, phone, address)
+
+class Electrician(User):
+    def __init__(self, userId: int, name: str, email: str, phone: str, address: str):
+        super().__init__(userId, name, email, phone, address)

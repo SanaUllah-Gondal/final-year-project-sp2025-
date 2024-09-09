@@ -1,0 +1,33 @@
+# models/auth.py
+"""
+Authentication-related classes
+"""
+
+class OTP:
+    def __init__(self, userEmail: str, otpCode: str):
+        self.userEmail = userEmail
+        self.otpCode = otpCode
+    
+    def verifyOTP(self):
+        """Verify the OTP code"""
+        return True  # Placeholder implementation
+
+class UserSignup:
+    def __init__(self, userId: int, name: str, email: str, password: str):
+        self.userId = userId
+        self.name = name
+        self.email = email
+        self.password = password
+    
+    def createAccount(self):
+        """Create a new user account"""
+        pass
+
+class UserLogin:
+    def __init__(self, email: str, password: str):
+        self.email = email
+        self.password = password
+    
+    def validateUser(self):
+        """Validate user credentials"""
+        return True  # Placeholder implementation
