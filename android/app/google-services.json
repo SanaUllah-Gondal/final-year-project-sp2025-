@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "184885743498",
+    "project_id": "skill-link47",
+    "storage_bucket": "skill-link47.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:184885743498:android:7896cab48256382c318273",
+        "android_client_info": {
+          "package_name": "com.example.plumber_project"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwjAW44OP0586rnfEU7L2yXNFU5jTxIl4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

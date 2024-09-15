@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#FFFFFF</color>
+
+
+        <color name="background">#FFFFFFFF</color>
+        <color name="status_bar_color">#1976D2</color>
+        <color name="launch_status_bar_color">#1976D2</color>
+
+        <!-- Material Design Colors -->
+        <color name="colorPrimary">#1976D2</color>
+        <color name="colorPrimaryDark">#1565C0</color>
+        <color name="colorAccent">#FF4081</color>
+
+</resources>
