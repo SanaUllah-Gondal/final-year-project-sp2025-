@@ -1,0 +1,99 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: SignUpForm(),
+    );
+  }
+}
+
+class SignUpForm extends StatefulWidget {
+  @override
+  _SignUpFormState createState() => _SignUpFormState();
+}
+
+class _SignUpFormState extends State<SignUpForm> {
+  final _formKey = GlobalKey<FormState>();
+
+  String previousSGPA = '';
+  String newSGPA = '';
+  String previousCreditHours = '';
+  String newCreditHours = '';
+  String totalAvg = '';
+
+  void calculateTotalAvg() {
+    // Your calculation logic here
+    // Example (ensure inputs are valid numerical values before using):
+    // totalAvg = ((double.parse(previousSGPA) * double.parse(previousCreditHours)) +
+    //              (double.parse(newSGPA) * double.parse(newCreditHours))) /
+    //              (double.parse(previousCreditHours) + double.parse(newCreditHours)))
+    //              .toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Sign Up')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: <Widget>[
+              TextFormField(
+                decoration: InputDecoration(labelText: 'Previous SGPA'),
+                keyboardType: TextInputType.number,
+                onSaved: (value) => previousSGPA = value!,
+              ),
+              TextFormField(
+                decoration: InputDecoration(labelText: 'New SGPA'),
+                keyboardType: TextInputType.number,
+                onSaved: (value) => newSGPA = value!,
+              ),
+              TextFormField(
+                decoration: InputDecoration(labelText: 'Previous Credit Hours'),
+                keyboardType: TextInputType.number,
+                onSaved: (value) => previousCreditHours = value!,
+              ),
+              TextFormField(
+                decoration: InputDecoration(labelText: 'New Credit Hours'),
+                keyboardType: TextInputType.number,
+                onSaved: (value) => newCreditHours = value!,
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  if (_formKey.currentState!.validate()) {
+                    _formKey.currentState!.save();
+                    calculateTotalAvg();
+                    // Show the total average
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Total Average'),
+                        content: Text(totalAvg),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: Text('Okay'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
+                child: Text('Calculate Total Avg'),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
