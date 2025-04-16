@@ -356,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icon(Icons.room_service, color: Colors.black, size: 37),
                     SizedBox(width: 8),
                     Text(
-                      "Handy-Hive",
+                      "Skill-Link",
                       style: GoogleFonts.poppins(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,

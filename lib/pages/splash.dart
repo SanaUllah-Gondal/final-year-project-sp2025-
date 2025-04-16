@@ -34,7 +34,7 @@ class _SplashScreenState extends State<SplashScreen> {
             Icon(Icons.room_service, color: Colors.black, size: 80),
             SizedBox(height: 20),
             Text(
-              'Handy-Hive',
+              'Skill-Link',
               style: TextStyle(
                 fontSize: 30,
                 fontWeight: FontWeight.bold,

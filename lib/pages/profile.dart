@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:plumber_project/pages/dashboard.dart';
+import 'package:plumber_project/pages/emergency.dart';
 import 'package:plumber_project/pages/login.dart';
 import 'package:plumber_project/pages/setting.dart';
 
@@ -23,7 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => SettingsScreen()),
+        MaterialPageRoute(builder: (context) => EmergencyScreen()),
       );
     } else if (index == 2) {
       Navigator.push(
@@ -85,6 +86,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: Text('Edit Profile'),
               onTap: () {
                 Navigator.pop(context); // Just close drawer here
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.settings),
+              title: Text('Setting'),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => SettingsScreen()));
               },
             ),
             ListTile(
@@ -155,13 +165,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         onTap: _onItemTapped,
         selectedItemColor: Colors.cyan,
         unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+        items: [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
+            icon: Icon(
+              Icons.emergency,
+              color: Colors.red, // 🔴 Always red
+            ),
+            label: "Emergency",
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
       ),
     );
