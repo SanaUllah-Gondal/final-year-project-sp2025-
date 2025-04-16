@@ -249,11 +249,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:plumber_project/pages/login.dart';
+import 'package:plumber_project/pages/plumber_profile.dart';
 import 'dart:convert';
 
 import 'otp_page.dart'; // Import OTP screen
 
 class SignUpScreen extends StatefulWidget {
+  const SignUpScreen({super.key});
+
   @override
   _SignUpScreenState createState() => _SignUpScreenState();
 }
@@ -301,7 +305,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://10.0.2.2:8000/api/signup/'), // Your API endpoint
+        Uri.parse('http://10.0.2.2:8000/api/register/'), // Your API endpoint
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'name': name,
@@ -366,12 +370,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _isOtpVisible = false;
     });
 
-    if (_selectedRole == 'coach') {
+    if (_selectedRole == 'plumber') {
       // Navigate to CoachDetailsScreen (uncomment after creating the screen)
-      // Navigator.pushReplacement(
-      //   context,
-      //   MaterialPageRoute(builder: (context) => CoachDetailsScreen()),
-      // );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => PlumberProfilePage()),
+      );
     } else {
       // Navigate to PlayerSelectorScreen (uncomment after creating the screen)
       // Navigator.pushReplacement(
@@ -466,8 +470,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
               value: _selectedRole,
               decoration: InputDecoration(border: OutlineInputBorder()),
               items: [
-                DropdownMenuItem(value: 'coach', child: Text("Coach")),
-                DropdownMenuItem(value: 'player', child: Text("Player")),
+                DropdownMenuItem(value: 'plumber', child: Text("Plumber")),
+                DropdownMenuItem(value: 'electrition', child: Text("Electrition")),
+                DropdownMenuItem(value: 'user', child: Text("User")),
+
               ],
               onChanged: (value) {
                 setState(() {
@@ -481,11 +487,32 @@ class _SignUpScreenState extends State<SignUpScreen> {
             // Sign Up Button
             ElevatedButton(
               onPressed: _isLoading ? null : _handleSignUp,
-              child: Text(_isLoading ? "Signing Up..." : "Sign Up"),
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(vertical: 15),
                 textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
+              child: Text(_isLoading ? "Signing Up..." : "Sign Up"),
+            ),
+             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text("You have an account?"),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => LoginScreen()),
+                    );
+                  },
+                  child: Text(
+                    "Log-in",
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

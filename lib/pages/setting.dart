@@ -3,12 +3,14 @@ import 'package:plumber_project/pages/dashboard.dart';
 import 'package:plumber_project/pages/profile.dart';
 
 class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+
   @override
   _SettingsScreenState createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  int _selectedIndex = 1; // Default to Settings
+  final int _selectedIndex = 1; // Default to Settings
 
   void _onItemTapped(int index) {
     if (index == 0) {

@@ -4,7 +4,7 @@ class ServiceCard extends StatelessWidget {
   final IconData icon;
   final String title;
 
-  ServiceCard({required this.icon, required this.title});
+  const ServiceCard({super.key, required this.icon, required this.title});
 
   @override
   Widget build(BuildContext context) {

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:http/http.dart' as http;
-import 'package:plumber_project/pages/dashboard.dart';
 
 class OtpPopupScreen extends StatefulWidget {
   final String email;
@@ -10,7 +8,7 @@ class OtpPopupScreen extends StatefulWidget {
   final Function onClose;
   final Function onSuccess;
 
-  OtpPopupScreen({
+  const OtpPopupScreen({super.key, 
     required this.email,
     required this.visible,
     required this.onClose,
@@ -22,7 +20,7 @@ class OtpPopupScreen extends StatefulWidget {
 }
 
 class _OtpPopupScreenState extends State<OtpPopupScreen> {
-  TextEditingController _otpController = TextEditingController();
+  final TextEditingController _otpController = TextEditingController();
   bool _loading = false;
   bool _resendLoading = false;
   int _timer = 60;
@@ -74,8 +72,8 @@ class _OtpPopupScreenState extends State<OtpPopupScreen> {
       );
 
       if (response.statusCode == 200) {
-        // widget.onSuccess();
-        Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+        widget.onSuccess();
+        // Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
       } else {
         _showAlert('Error', 'Invalid OTP');
       }

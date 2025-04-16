@@ -183,16 +183,19 @@ import 'package:flutter/material.dart';
 import 'service.dart';
 import 'setting.dart';
 import 'profile.dart';
+import 'emergency.dart'; // ✅ Import the emergency screen
 import 'package:google_fonts/google_fonts.dart';
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _showSearchBar = false;
-  TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   int _selectedIndex = 0;
 
   List<Map<String, dynamic>> services = [
@@ -246,7 +249,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => SettingsScreen()),
+        MaterialPageRoute(
+          builder: (context) => EmergencyScreen(),
+        ), // ✅ Navigate to Emergency
       );
     } else if (index == 2) {
       Navigator.push(
@@ -284,8 +289,6 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (_selectedIndex) {
       case 0:
         return _buildHomeScreen();
-      case 1:
-        return SettingsScreen();
       case 2:
         return ProfileScreen();
       default:
@@ -331,7 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false, // ✅ Hides the back arrow
+        automaticallyImplyLeading: false,
         title:
             _showSearchBar
                 ? AnimatedContainer(
@@ -353,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icon(Icons.room_service, color: Colors.black, size: 37),
                     SizedBox(width: 8),
                     Text(
-                      "Haazir",
+                      "Handy-Hive",
                       style: GoogleFonts.poppins(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -385,8 +388,11 @@ class _HomeScreenState extends State<HomeScreen> {
         items: [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: "Settings",
+            icon: Icon(
+              Icons.emergency,
+              color: Colors.red, // 🔴 Always red
+            ),
+            label: "Emergency",
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],

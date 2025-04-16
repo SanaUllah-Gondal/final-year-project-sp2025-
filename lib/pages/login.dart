@@ -5,6 +5,8 @@ import 'signup_screen.dart'; // Make sure you create this file
 import 'dashboard.dart'; // Your Dashboard screen
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
@@ -30,14 +32,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://10.0.2.2:8000/api/login/'), // Your API endpoint
+        Uri.parse('http://10.0.2.2:8000/api/login'), // Your API endpoint
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
 
       final data = jsonDecode(response.body);
-      if (response.statusCode == 200 && data['success'] == true) {
-        print("Done hoo gya"); // ✅ Print the message in the console
+     if (response.statusCode == 200 && data.containsKey('access_token')) {
+       
 
         // ✅ Navigate to Dashboard Screen
         Navigator.pushReplacement(
@@ -126,11 +128,11 @@ class _LoginScreenState extends State<LoginScreen> {
             // Login Button
             ElevatedButton(
               onPressed: _isLoading ? null : _handleLogin,
-              child: Text(_isLoading ? "Logging in..." : "Login"),
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(vertical: 15),
                 textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
+              child: Text(_isLoading ? "Logging in..." : "Login"),
             ),
             SizedBox(height: 10),
 
