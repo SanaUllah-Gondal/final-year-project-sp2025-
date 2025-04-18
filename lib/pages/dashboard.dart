@@ -209,6 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
     {"icon": Icons.bug_report, "title": "Pest Control"},
     {"icon": Icons.girl, "title": "Wall Panelling"},
     {"icon": Icons.wallpaper, "title": "Wall Panelling"},
+    {"icon": Icons.cleaning_services, "title": "Cleaner"},
   ];
   List<Map<String, dynamic>> filteredServices = [];
 
