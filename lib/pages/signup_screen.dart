@@ -249,8 +249,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:plumber_project/pages/electrition_profile.dart';
 import 'package:plumber_project/pages/login.dart';
 import 'package:plumber_project/pages/plumber_profile.dart';
+import 'package:plumber_project/pages/user_profile.dart';
 import 'dart:convert';
 
 import 'otp_page.dart'; // Import OTP screen
@@ -366,24 +368,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   // Function to handle OTP success and navigate
   void _handleOtpSuccess() {
-    setState(() {
-      _isOtpVisible = false;
-    });
+  setState(() {
+    _isOtpVisible = false;
+  });
 
-    if (_selectedRole == 'plumber') {
-      // Navigate to CoachDetailsScreen (uncomment after creating the screen)
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => PlumberProfilePage()),
-      );
-    } else {
-      // Navigate to PlayerSelectorScreen (uncomment after creating the screen)
-      // Navigator.pushReplacement(
-      //   context,
-      //   MaterialPageRoute(builder: (context) => PlayerSelectorScreen()),
-      // );
-    }
+  if (_selectedRole == 'plumber') {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => PlumberProfilePage()),
+    );
+  } else if (_selectedRole == 'electrition') {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => ElectricianProfilePage()),
+    );
+  } else if (_selectedRole == 'user') {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => UserProfilePage()),
+    );
   }
+} // ✅ This closing brace was missing
 
   @override
   Widget build(BuildContext context) {
@@ -519,4 +524,4 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ),
     );
   }
-}
+  } 
