@@ -179,7 +179,11 @@
 //     );
 //   }
 // }
+
+//0000000000000000000000000000000000000000000000000000000000 this program show me the details
 import 'package:flutter/material.dart';
+import 'package:plumber_project/pages/userservice/electricianservice.dart';
+import 'package:plumber_project/pages/userservice/plumberservice.dart';
 import 'service.dart';
 import 'setting.dart';
 import 'profile.dart';
@@ -267,23 +271,35 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onServiceCardClicked(String serviceName) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(serviceName),
-          content: Text('You clicked on the $serviceName service.'),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
+    if (serviceName.toLowerCase() == 'plumber') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PlumberPage()),
+      );
+    } else if (serviceName.toLowerCase() == 'electrician') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => ElectricianPage()),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text(serviceName),
+            content: Text('You clicked on the $serviceName service.'),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    }
   }
 
   Widget _getScreen() {

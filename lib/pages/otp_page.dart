@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:http/http.dart' as http;
+import 'package:plumber_project/pages/Apis.dart';
+import 'package:plumber_project/pages/login.dart';
 
 class OtpPopupScreen extends StatefulWidget {
   final String email;
@@ -8,7 +10,8 @@ class OtpPopupScreen extends StatefulWidget {
   final Function onClose;
   final Function onSuccess;
 
-  const OtpPopupScreen({super.key, 
+  const OtpPopupScreen({
+    super.key,
     required this.email,
     required this.visible,
     required this.onClose,
@@ -67,13 +70,16 @@ class _OtpPopupScreenState extends State<OtpPopupScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://10.0.2.2:8000/api/verify-otp'),
+        Uri.parse('$baseUrl/api/verify-otp'),
         body: {'email': widget.email, 'otp': _otpController.text},
       );
 
       if (response.statusCode == 200) {
-        widget.onSuccess();
-        // Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+        // widget.onSuccess();
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+        );
       } else {
         _showAlert('Error', 'Invalid OTP');
       }

@@ -24,7 +24,6 @@
 //   }
 // }
 
-
 // import 'package:flutter/material.dart';
 // import 'package:plumber_project/pages/splash.dart';
 // import 'package:plumber_project/pages/theme.dart'; // Make sure you import your AppTheme class
@@ -66,12 +65,80 @@
 //   }
 // }
 
+// import 'package:flutter/material.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
+// import 'package:plumber_project/pages/splash.dart';
+// import 'package:plumber_project/pages/dashboard.dart'; // Your HomeScreen
+// import 'package:plumber_project/pages/theme.dart';
+
+// void main() async {
+//   WidgetsFlutterBinding.ensureInitialized();
+//   SharedPreferences prefs = await SharedPreferences.getInstance();
+
+//   bool rememberMe = prefs.getBool('remember_me') ?? false;
+//   String? token = prefs.getString('token');
+
+//   // 👇 Check for saved token and remember flag
+//   Widget initialScreen;
+//   if (rememberMe && token != null && token.isNotEmpty) {
+//     initialScreen = HomeScreen(); // ✅ Skip login
+//   } else {
+//     initialScreen = SplashScreen(); // Or LoginScreen if you prefer
+//   }
+
+//   runApp(MyApp(initialScreen: initialScreen));
+// }
+
+// class MyApp extends StatefulWidget {
+//   final Widget initialScreen;
+//   const MyApp({super.key, required this.initialScreen});
+
+//   static _MyAppState? of(BuildContext context) =>
+//       context.findAncestorStateOfType<_MyAppState>();
+
+//   @override
+//   State<MyApp> createState() => _MyAppState();
+// }
+
+// class _MyAppState extends State<MyApp> {
+//   bool _isDarkTheme = false;
+
+//   void toggleTheme(bool isDark) {
+//     setState(() {
+//       _isDarkTheme = isDark;
+//     });
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return MaterialApp(
+//       title: 'Plumber Project',
+//       debugShowCheckedModeBanner: false,
+//       theme: AppTheme.lightTheme,
+//       darkTheme: AppTheme.darkTheme,
+//       themeMode: _isDarkTheme ? ThemeMode.dark : ThemeMode.light,
+//       home: widget.initialScreen,
+//     );
+//   }
+// }
 
 import 'package:flutter/material.dart';
+import 'package:plumber_project/pages/emergency.dart';
+import 'package:plumber_project/pages/userservice/plumberservice.dart';
+import 'package:plumber_project/test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
 import 'package:plumber_project/pages/splash.dart';
-import 'package:plumber_project/pages/dashboard.dart'; // Your HomeScreen
 import 'package:plumber_project/pages/theme.dart';
+import 'package:plumber_project/pages/login.dart';
+import 'package:plumber_project/pages/plumber_dashboard.dart';
+import 'package:plumber_project/pages/electrition_dashboard.dart';
+import 'package:plumber_project/pages/dashboard.dart';
+import 'package:plumber_project/pages/plumber_profile.dart';
+import 'package:plumber_project/pages/electrition_profile.dart';
+import 'package:plumber_project/pages/user_profile.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -79,16 +146,43 @@ void main() async {
 
   bool rememberMe = prefs.getBool('remember_me') ?? false;
   String? token = prefs.getString('token');
+  String? role = prefs.getString('role');
+  int? userId = prefs.getInt('user_id');
 
-  // 👇 Check for saved token and remember flag
-  Widget initialScreen;
-  if (rememberMe && token != null && token.isNotEmpty) {
-    initialScreen = HomeScreen(); // ✅ Skip login
+  Widget initialScreen = LoginScreen();
+
+  if (rememberMe && token != null && role != null && userId != null) {
+    bool hasProfile = await checkUserProfile(userId, token);
+    if (role == 'plumber') {
+      initialScreen = hasProfile ? PlumberDashboard() : PlumberProfilePage();
+    } else if (role == 'electrician') {
+      initialScreen =
+          hasProfile ? ElectricianDashboard() : ElectricianProfilePage();
+    } else {
+      initialScreen = hasProfile ? HomeScreen() : UserProfilePage();
+    }
   } else {
-    initialScreen = SplashScreen(); // Or LoginScreen if you prefer
+    initialScreen = SplashScreen();
   }
 
   runApp(MyApp(initialScreen: initialScreen));
+}
+
+Future<bool> checkUserProfile(int userId, String token) async {
+  try {
+    final response = await http.get(
+      Uri.parse('http://10.0.2.2:8000/api/check-profile/$userId'),
+      headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['profile_exists'] == true;
+    } else {
+      return false;
+    }
+  } catch (e) {
+    return false;
+  }
 }
 
 class MyApp extends StatefulWidget {
@@ -119,6 +213,7 @@ class _MyAppState extends State<MyApp> {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: _isDarkTheme ? ThemeMode.dark : ThemeMode.light,
+      // home: PlumberPage(),
       home: widget.initialScreen,
     );
   }
