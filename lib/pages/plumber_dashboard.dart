@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:plumber_project/pages/emergency.dart';
+import 'package:plumber_project/pages/plumber/plumberrequest.dart';
 import 'package:plumber_project/pages/plumber_dashboard_card.dart';
 import 'package:plumber_project/pages/profile.dart';
 
@@ -60,9 +61,7 @@ class _PlumberDashboardState extends State<PlumberDashboard> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.notifications),
-            label: 'Notifications',
-          ),
+              icon: Icon(Icons.notifications), label: 'Notifications'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
@@ -84,6 +83,12 @@ class HomeContent extends StatelessWidget {
             title: "New Requests",
             icon: Icons.assignment,
             color: Colors.orange,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AppointmentList()),
+              );
+            },
           ),
           DashboardCard(
             title: "Ongoing Jobs",

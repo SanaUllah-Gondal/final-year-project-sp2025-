@@ -2562,6 +2562,356 @@
 //   }
 // }
 
+//0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 this code sucessfully create the data in the database with current live location can be display in the text fields
+// import 'dart:convert';
+// import 'dart:io';
+// import 'dart:math';
+// import 'package:flutter/material.dart';
+// import 'package:flutter/services.dart';
+// import 'package:http/http.dart' as http;
+// import 'package:image_picker/image_picker.dart';
+// import 'package:file_picker/file_picker.dart';
+// import 'package:plumber_project/pages/Apis.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
+// import 'package:geolocator/geolocator.dart';
+// import 'package:geocoding/geocoding.dart';
+// import 'package:plumber_project/pages/plumber_dashboard.dart';
+
+// class PlumberProfilePage extends StatefulWidget {
+//   final VoidCallback? onSuccess;
+
+//   const PlumberProfilePage({super.key, this.onSuccess});
+
+//   @override
+//   _PlumberProfilePageState createState() => _PlumberProfilePageState();
+// }
+
+// class _PlumberProfilePageState extends State<PlumberProfilePage> {
+//   final TextEditingController nameController = TextEditingController();
+//   final TextEditingController experienceController = TextEditingController();
+//   final TextEditingController skillsController = TextEditingController();
+//   final TextEditingController areaController = TextEditingController();
+//   final TextEditingController rateController = TextEditingController();
+//   final TextEditingController contactController = TextEditingController();
+//   final TextEditingController roleController = TextEditingController();
+
+//   final FocusNode areaFocusNode = FocusNode();
+
+//   File? _profileImage;
+//   List<dynamic> _placeList = [];
+//   String _sessionToken = "1234567890";
+//   String? _bearerToken;
+
+//   double? _latitude;
+//   double? _longitude;
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     areaController.addListener(_onChanged);
+//     areaFocusNode.addListener(() {
+//       if (!areaFocusNode.hasFocus) {
+//         setState(() {
+//           _placeList = [];
+//         });
+//       }
+//     });
+//     _loadLocalData();
+//     _getLiveLocation(); // Auto location
+//   }
+
+//   Future<void> _loadLocalData() async {
+//     final prefs = await SharedPreferences.getInstance();
+//     final role = prefs.getString('role') ?? 'Unknown';
+//     final token = prefs.getString('token');
+//     setState(() {
+//       roleController.text = role;
+//       _bearerToken = token;
+//     });
+//   }
+
+//   void _onChanged() {
+//     if (_sessionToken == "1234567890") {
+//       setState(() {
+//         _sessionToken = Random().nextInt(100000).toString();
+//       });
+//     }
+//     getSuggestion(areaController.text);
+//   }
+
+//   Future<void> getSuggestion(String input) async {
+//     const String PLACES_APIS_KEY = "YOUR_API_KEY_HERE";
+//     try {
+//       String baseURL =
+//           'https://maps.googleapis.com/maps/api/place/autocomplete/json';
+//       String request =
+//           '$baseURL?input=$input&key=$PLACES_APIS_KEY&sessiontoken=$_sessionToken';
+//       var response = await http.get(Uri.parse(request));
+//       if (response.statusCode == 200) {
+//         setState(() {
+//           _placeList = json.decode(response.body)['predictions'];
+//         });
+//       }
+//     } catch (e) {
+//       print(e);
+//     }
+//   }
+
+//   Future<void> _getLiveLocation() async {
+//     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+//     if (!serviceEnabled) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text("Location services are disabled.")),
+//       );
+//       return;
+//     }
+
+//     LocationPermission permission = await Geolocator.checkPermission();
+//     if (permission == LocationPermission.denied) {
+//       permission = await Geolocator.requestPermission();
+//       if (permission == LocationPermission.denied) {
+//         ScaffoldMessenger.of(
+//           context,
+//         ).showSnackBar(SnackBar(content: Text("Location permission denied.")));
+//         return;
+//       }
+//     }
+
+//     if (permission == LocationPermission.deniedForever) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text("Location permission permanently denied.")),
+//       );
+//       return;
+//     }
+
+//     try {
+//       Position position = await Geolocator.getCurrentPosition(
+//         desiredAccuracy: LocationAccuracy.high,
+//       );
+//       _latitude = position.latitude;
+//       _longitude = position.longitude;
+
+//       List<Placemark> placemarks = await placemarkFromCoordinates(
+//         _latitude!,
+//         _longitude!,
+//       );
+//       if (placemarks.isNotEmpty) {
+//         String locationName =
+//             placemarks.first.locality ??
+//             placemarks.first.administrativeArea ??
+//             '';
+//         setState(() {
+//           areaController.text = locationName;
+//         });
+//       }
+//     } catch (e) {
+//       print("Location fetch error: $e");
+//     }
+//   }
+
+//   Future<void> _pickImageFromGallery() async {
+//     final picker = ImagePicker();
+//     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+//     if (pickedFile != null) {
+//       setState(() {
+//         _profileImage = File(pickedFile.path);
+//       });
+//     }
+//   }
+
+//   Future<void> _submitProfile() async {
+//     if (_bearerToken == null || _bearerToken!.isEmpty) {
+//       print('Error: Bearer token is null or empty');
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text('Authentication token is missing')),
+//       );
+//       return;
+//     }
+
+//     final url = Uri.parse('$baseUrl/api/profile/');
+//     final request = http.MultipartRequest('POST', url);
+
+//     request.headers.addAll({
+//       'Authorization': 'Bearer $_bearerToken',
+//       'Accept': 'application/json',
+//     });
+
+//     // Add text fields
+//     request.fields['full_name'] = nameController.text;
+//     request.fields['experience'] = experienceController.text;
+//     request.fields['skill'] = skillsController.text;
+//     request.fields['service_area'] = areaController.text;
+//     request.fields['hourly_rate'] = rateController.text;
+//     request.fields['contact_number'] = contactController.text;
+//     request.fields['role'] = roleController.text;
+
+//     // Optional coordinates
+//     if (_latitude != null && _longitude != null) {
+//       request.fields['latitude'] = _latitude.toString();
+//       request.fields['longitude'] = _longitude.toString();
+//     }
+
+//     // Image if selected
+//     if (_profileImage != null) {
+//       request.files.add(
+//         await http.MultipartFile.fromPath('plumber_image', _profileImage!.path),
+//       );
+//     }
+
+//     try {
+//       final streamedResponse = await request.send();
+//       final response = await http.Response.fromStream(streamedResponse);
+
+//       if (response.statusCode == 200 || response.statusCode == 201) {
+//         ScaffoldMessenger.of(
+//           context,
+//         ).showSnackBar(SnackBar(content: Text('Profile saved successfully')));
+//         Navigator.pushReplacement(
+//           context,
+//           MaterialPageRoute(builder: (_) => PlumberDashboard()),
+//         );
+//       } else {
+//         print('Failed: ${response.statusCode}');
+//         print('Body: ${response.body}');
+//         ScaffoldMessenger.of(
+//           context,
+//         ).showSnackBar(SnackBar(content: Text('Failed to save profile')));
+//       }
+//     } catch (e) {
+//       print('Error: $e');
+//       ScaffoldMessenger.of(
+//         context,
+//       ).showSnackBar(SnackBar(content: Text('Error saving profile')));
+//     }
+//   }
+
+//   @override
+//   void dispose() {
+//     areaFocusNode.dispose();
+//     nameController.dispose();
+//     experienceController.dispose();
+//     skillsController.dispose();
+//     areaController.dispose();
+//     rateController.dispose();
+//     contactController.dispose();
+//     roleController.dispose();
+//     super.dispose();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: Text("Plumber Profile", style: TextStyle(color: Colors.black)),
+//         backgroundColor: Colors.white,
+//         iconTheme: IconThemeData(color: Colors.black),
+//       ),
+//       body: SingleChildScrollView(
+//         padding: EdgeInsets.all(16),
+//         child: Column(
+//           children: [
+//             Center(
+//               child: Column(
+//                 children: [
+//                   CircleAvatar(
+//                     radius: 50,
+//                     backgroundImage:
+//                         _profileImage != null
+//                             ? FileImage(_profileImage!)
+//                             : null,
+//                     backgroundColor: Colors.grey,
+//                     child:
+//                         _profileImage == null
+//                             ? Icon(Icons.person, size: 60, color: Colors.white)
+//                             : null,
+//                   ),
+//                   SizedBox(height: 10),
+//                   TextButton.icon(
+//                     onPressed: _pickImageFromGallery,
+//                     icon: Icon(Icons.camera_alt),
+//                     label: Text("Update Photo"),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//             SizedBox(height: 20),
+//             _buildLabeledTextField("Full Name", nameController),
+//             _buildLabeledTextField(
+//               "Experience (Years)",
+//               experienceController,
+//               type: TextInputType.number,
+//             ),
+//             _buildLabeledTextField("Skills", skillsController),
+//             _buildLabeledTextField(
+//               "Service Area",
+//               areaController,
+//               readOnly: true,
+//             ),
+//             _buildLabeledTextField(
+//               "Hourly Rate (PKR)",
+//               rateController,
+//               type: TextInputType.number,
+//             ),
+//             _buildLabeledTextField(
+//               "Contact Number",
+//               contactController,
+//               type: TextInputType.phone,
+//               inputFormatters: [
+//                 FilteringTextInputFormatter.digitsOnly,
+//                 LengthLimitingTextInputFormatter(11),
+//               ],
+//             ),
+//             _buildLabeledTextField("Role", roleController, readOnly: true),
+//             SizedBox(height: 30),
+//             Center(
+//               child: ElevatedButton(
+//                 onPressed: _submitProfile,
+//                 style: ElevatedButton.styleFrom(
+//                   backgroundColor: Colors.grey,
+//                   padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+//                 ),
+//                 child: Text("Save Profile", style: TextStyle(fontSize: 16)),
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildLabeledTextField(
+//     String label,
+//     TextEditingController controller, {
+//     TextInputType type = TextInputType.text,
+//     List<TextInputFormatter>? inputFormatters,
+//     bool readOnly = false,
+//   }) {
+//     return Padding(
+//       padding: const EdgeInsets.only(bottom: 20),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Text(
+//             label,
+//             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+//           ),
+//           SizedBox(height: 8),
+//           TextField(
+//             controller: controller,
+//             keyboardType: type,
+//             inputFormatters: inputFormatters,
+//             readOnly: readOnly,
+//             decoration: InputDecoration(
+//               border: OutlineInputBorder(),
+//               hintText: 'Enter $label',
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -2622,7 +2972,7 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
   Future<void> _loadLocalData() async {
     final prefs = await SharedPreferences.getInstance();
     final role = prefs.getString('role') ?? 'Unknown';
-    final token = prefs.getString('token');
+    final token = prefs.getString('bearer_token');
     setState(() {
       roleController.text = role;
       _bearerToken = token;
@@ -2690,21 +3040,54 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
       _latitude = position.latitude;
       _longitude = position.longitude;
 
+      // Reverse geocode to get area name
       List<Placemark> placemarks = await placemarkFromCoordinates(
         _latitude!,
         _longitude!,
       );
       if (placemarks.isNotEmpty) {
-        String locationName =
-            placemarks.first.locality ??
+        String locationName = placemarks.first.locality ??
             placemarks.first.administrativeArea ??
             '';
         setState(() {
           areaController.text = locationName;
         });
       }
+
+      // NEW: Send location to backend
+      await _updateLocationOnServer(_latitude!, _longitude!);
     } catch (e) {
       print("Location fetch error: $e");
+    }
+  }
+
+  // NEW METHOD to update location on backend
+  Future<void> _updateLocationOnServer(double lat, double lng) async {
+    if (_bearerToken == null || _bearerToken!.isEmpty) {
+      print("Bearer token missing, can't update location");
+      return;
+    }
+
+    final url = Uri.parse('$baseUrl/api/profile/update-location');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer $_bearerToken',
+          'Accept': 'application/json',
+        },
+        body: {'latitude': lat.toString(), 'longitude': lng.toString()},
+      );
+
+      if (response.statusCode == 200) {
+        print('Location updated on server');
+      } else {
+        print('Failed to update location on server: ${response.statusCode}');
+        print('Response body: ${response.body}');
+      }
+    } catch (e) {
+      print('Error updating location on server: $e');
     }
   }
 
@@ -2814,15 +3197,13 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
                 children: [
                   CircleAvatar(
                     radius: 50,
-                    backgroundImage:
-                        _profileImage != null
-                            ? FileImage(_profileImage!)
-                            : null,
+                    backgroundImage: _profileImage != null
+                        ? FileImage(_profileImage!)
+                        : null,
                     backgroundColor: Colors.grey,
-                    child:
-                        _profileImage == null
-                            ? Icon(Icons.person, size: 60, color: Colors.white)
-                            : null,
+                    child: _profileImage == null
+                        ? Icon(Icons.person, size: 60, color: Colors.white)
+                        : null,
                   ),
                   SizedBox(height: 10),
                   TextButton.icon(
@@ -2841,6 +3222,7 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
               type: TextInputType.number,
             ),
             _buildLabeledTextField("Skills", skillsController),
+            // Keep readOnly true so user cannot manually edit area (optional)
             _buildLabeledTextField(
               "Service Area",
               areaController,

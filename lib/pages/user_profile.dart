@@ -654,7 +654,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       roleController.text = prefs.getString('role') ?? 'Unknown';
-      _bearerToken = prefs.getString('token');
+      _bearerToken = prefs.getString('bearer_token');
     });
   }
 
@@ -728,37 +728,36 @@ class _UserProfilePageState extends State<UserProfilePage> {
   Future<void> _pickImageOption() async {
     showModalBottomSheet(
       context: context,
-      builder:
-          (_) => SafeArea(
-            child: Wrap(
-              children: [
-                ListTile(
-                  leading: Icon(Icons.camera_alt),
-                  title: Text('Camera'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.camera);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.photo_library),
-                  title: Text('Gallery'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.gallery);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.insert_drive_file),
-                  title: Text('File'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImageFromFile();
-                  },
-                ),
-              ],
+      builder: (_) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: Icon(Icons.camera_alt),
+              title: Text('Camera'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.camera);
+              },
             ),
-          ),
+            ListTile(
+              leading: Icon(Icons.photo_library),
+              title: Text('Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.insert_drive_file),
+              title: Text('File'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImageFromFile();
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -892,15 +891,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 children: [
                   CircleAvatar(
                     radius: 50,
-                    backgroundImage:
-                        _profileImage != null
-                            ? FileImage(_profileImage!)
-                            : null,
+                    backgroundImage: _profileImage != null
+                        ? FileImage(_profileImage!)
+                        : null,
                     backgroundColor: Colors.grey,
-                    child:
-                        _profileImage == null
-                            ? Icon(Icons.person, size: 60, color: Colors.white)
-                            : null,
+                    child: _profileImage == null
+                        ? Icon(Icons.person, size: 60, color: Colors.white)
+                        : null,
                   ),
                   SizedBox(height: 10),
                   TextButton.icon(

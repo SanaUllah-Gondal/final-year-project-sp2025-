@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.2
+  sdk: '>=3.4.0 <4.0.0'
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -30,15 +30,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
-  cached_network_image: ^3.4.1
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
   http: ^1.3.0
   google_fonts: ^4.0.3
   image_picker: ^1.1.2
@@ -47,6 +38,30 @@ dev_dependencies:
   permission_handler: ^12.0.0+1
   geolocator: ^14.0.0
   geocoding: ^3.0.0
+  google_maps_flutter: ^2.12.2
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^1.0.8
+  cached_network_image: ^3.4.1
+  socket_io_client: ^3.1.2
+  uuid: ^4.5.1
+  lottie: ^3.3.1
+  open_file: ^3.5.10
+  device_info_plus: ^11.4.0
+  
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.14.3
+
+
+flutter_icons:
+  android: true
+  image_path: "assets/images/skill_link.png"
+  adaptive_icon_background: "#FFFFFF" # or image path
+  adaptive_icon_foreground: "assets/images/skill_link.png"
+  
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your
@@ -66,8 +81,9 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - assets/images/
+  assets:
+      - assets/animation/finding_providers.json
+      - assets/images/placeholder.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
