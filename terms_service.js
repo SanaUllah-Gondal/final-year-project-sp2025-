@@ -1,0 +1,1 @@
+// Serve static terms content

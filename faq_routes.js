@@ -1,0 +1,1 @@
+// Routes to serve FAQ data
