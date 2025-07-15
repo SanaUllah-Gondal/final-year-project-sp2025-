@@ -1,0 +1,2 @@
+Primary: #1E88E5
+Accent: #FFC107
