@@ -1,0 +1,1 @@
+Pricing = base + per hour rate
