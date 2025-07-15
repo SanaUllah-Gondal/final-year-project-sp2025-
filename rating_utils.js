@@ -1,0 +1,1 @@
+// Helper to average worker ratings
