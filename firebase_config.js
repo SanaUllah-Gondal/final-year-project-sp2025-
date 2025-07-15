@@ -1,0 +1,1 @@
+// Firebase connection setup
