@@ -1,0 +1,1 @@
+Detection logic: duplicate phone, location anomaly
