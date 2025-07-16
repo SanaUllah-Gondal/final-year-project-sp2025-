@@ -1,0 +1,1 @@
+Images stored in Firebase Storage or Cloudinary
