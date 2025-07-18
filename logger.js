@@ -1,1 +1,1 @@
-// Log app events
+// Placeholder for logger.js

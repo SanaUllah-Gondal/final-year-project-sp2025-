@@ -1,1 +1,1 @@
-// Home screen UI for SkillLink app
+// Placeholder for home_screen.dart

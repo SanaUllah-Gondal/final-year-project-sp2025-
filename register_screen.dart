@@ -1,1 +1,1 @@
-// Registration screen with email/phone
+// Placeholder for register_screen.dart
