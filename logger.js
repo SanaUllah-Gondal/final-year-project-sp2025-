@@ -1,1 +1,1 @@
-// Placeholder for logger.js
+module.exports = function(message) { console.log(message); };
