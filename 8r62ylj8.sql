@@ -1,0 +1,1 @@
+CREATE TABLE workers (id INT, name VARCHAR(100), skill VARCHAR(50));
