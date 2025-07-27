@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // import 'package:flutter/material.dart';
 // import 'package:plumber_project/pages/splash.dart';
 // import 'package:plumber_project/pages/theme.dart';
@@ -206,10 +207,23 @@ class _MyAppState extends State<MyApp> {
       _isDarkTheme = isDark;
     });
   }
+=======
+import 'package:flutter/material.dart';
+import 'package:plumber_project/pages/splash.dart';
+// Import the login screen
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+<<<<<<< HEAD
       title: 'Plumber Project',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
@@ -343,3 +357,12 @@ class _MyAppState extends State<MyApp> {
 //     );
 //   }
 // }
+=======
+      debugShowCheckedModeBanner: false, // Removes the debug banner
+      title: 'Flutter Login App',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: SplashScreen(), // Set LoginScreen as the home screen
+    );
+  }
+}
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654

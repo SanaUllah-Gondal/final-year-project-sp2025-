@@ -83,7 +83,11 @@
 //                    Navigator.push(
 //                       context,
 //                       MaterialPageRoute(builder: (context) => HomeScreen()),
+<<<<<<< HEAD
 
+=======
+                    
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
 //                   );
 //                 },
 //                 child: Text("Save Profile", style: TextStyle(fontSize: 16)),
@@ -126,6 +130,7 @@
 //   }
 // }
 
+<<<<<<< HEAD
 // import 'package:flutter/material.dart';
 // import 'package:image_picker/image_picker.dart';
 // import 'package:file_picker/file_picker.dart';
@@ -2925,6 +2930,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:plumber_project/pages/plumber_dashboard.dart';
+=======
+
+
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
+
+import 'package:plumber_project/pages/dashboard.dart';
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
 
 class PlumberProfilePage extends StatefulWidget {
   final VoidCallback? onSuccess;
@@ -2942,6 +2957,7 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
   final TextEditingController areaController = TextEditingController();
   final TextEditingController rateController = TextEditingController();
   final TextEditingController contactController = TextEditingController();
+<<<<<<< HEAD
   final TextEditingController roleController = TextEditingController();
 
   final FocusNode areaFocusNode = FocusNode();
@@ -3088,16 +3104,73 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
       }
     } catch (e) {
       print('Error updating location on server: $e');
+=======
+
+  File? _profileImage;
+
+  Future<void> _pickImageOption() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: Icon(Icons.camera_alt),
+                title: Text('Camera'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImageFromCamera();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_library),
+                title: Text('Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImageFromGallery();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.insert_drive_file),
+                title: Text('File'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImageFromFile();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickImageFromCamera() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.camera);
+
+    if (pickedFile != null) {
+      setState(() {
+        _profileImage = File(pickedFile.path);
+      });
+      widget.onSuccess?.call();
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
     }
   }
 
   Future<void> _pickImageFromGallery() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+<<<<<<< HEAD
+=======
+
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
     if (pickedFile != null) {
       setState(() {
         _profileImage = File(pickedFile.path);
       });
+<<<<<<< HEAD
     }
   }
 
@@ -3178,6 +3251,20 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
     contactController.dispose();
     roleController.dispose();
     super.dispose();
+=======
+      widget.onSuccess?.call();
+    }
+  }
+
+  Future<void> _pickImageFromFile() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (result != null && result.files.single.path != null) {
+      setState(() {
+        _profileImage = File(result.files.single.path!);
+      });
+      widget.onSuccess?.call();
+    }
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
   }
 
   @override
@@ -3191,12 +3278,17 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
+<<<<<<< HEAD
+=======
+          crossAxisAlignment: CrossAxisAlignment.start,
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
           children: [
             Center(
               child: Column(
                 children: [
                   CircleAvatar(
                     radius: 50,
+<<<<<<< HEAD
                     backgroundImage: _profileImage != null
                         ? FileImage(_profileImage!)
                         : null,
@@ -3208,6 +3300,21 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
                   SizedBox(height: 10),
                   TextButton.icon(
                     onPressed: _pickImageFromGallery,
+=======
+                    backgroundImage:
+                        _profileImage != null
+                            ? FileImage(_profileImage!)
+                            : null,
+                    backgroundColor: Colors.grey,
+                    child:
+                        _profileImage == null
+                            ? Icon(Icons.person, size: 60, color: Colors.white)
+                            : null,
+                  ),
+                  SizedBox(height: 10),
+                  TextButton.icon(
+                    onPressed: _pickImageOption,
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
                     icon: Icon(Icons.camera_alt),
                     label: Text("Update Photo"),
                   ),
@@ -3221,6 +3328,7 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
               experienceController,
               type: TextInputType.number,
             ),
+<<<<<<< HEAD
             _buildLabeledTextField("Skills", skillsController),
             // Keep readOnly true so user cannot manually edit area (optional)
             _buildLabeledTextField(
@@ -3228,6 +3336,13 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
               areaController,
               readOnly: true,
             ),
+=======
+            _buildLabeledTextField(
+              "Skills (e.g. pipe fitting, repair)",
+              skillsController,
+            ),
+            _buildLabeledTextField("Service Area", areaController),
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
             _buildLabeledTextField(
               "Hourly Rate (PKR)",
               rateController,
@@ -3237,6 +3352,7 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
               "Contact Number",
               contactController,
               type: TextInputType.phone,
+<<<<<<< HEAD
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(11),
@@ -3247,10 +3363,27 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
             Center(
               child: ElevatedButton(
                 onPressed: _submitProfile,
+=======
+            ),
+            SizedBox(height: 30),
+            Center(
+              child: ElevatedButton(
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.grey,
                   padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
                 ),
+<<<<<<< HEAD
+=======
+                onPressed: () {
+                  print("Name: ${nameController.text}");
+                  print("Skills: ${skillsController.text}");
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => HomeScreen()),
+                  );
+                },
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
                 child: Text("Save Profile", style: TextStyle(fontSize: 16)),
               ),
             ),
@@ -3264,8 +3397,11 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
     String label,
     TextEditingController controller, {
     TextInputType type = TextInputType.text,
+<<<<<<< HEAD
     List<TextInputFormatter>? inputFormatters,
     bool readOnly = false,
+=======
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
@@ -3280,11 +3416,19 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
           TextField(
             controller: controller,
             keyboardType: type,
+<<<<<<< HEAD
             inputFormatters: inputFormatters,
             readOnly: readOnly,
             decoration: InputDecoration(
               border: OutlineInputBorder(),
               hintText: 'Enter $label',
+=======
+            decoration: InputDecoration(
+              border: OutlineInputBorder(),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.black),
+              ),
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
             ),
           ),
         ],

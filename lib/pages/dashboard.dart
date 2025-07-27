@@ -179,6 +179,7 @@
 //     );
 //   }
 // }
+<<<<<<< HEAD
 
 //0000000000000000000000000000000000000000000000000000000000 this program show me the details
 // import 'package:flutter/material.dart';
@@ -1739,6 +1740,14 @@ import 'service.dart';
 import 'setting.dart';
 import 'profile.dart';
 import 'emergency.dart';
+=======
+import 'package:flutter/material.dart';
+import 'service.dart';
+import 'setting.dart';
+import 'profile.dart';
+import 'emergency.dart'; // ✅ Import the emergency screen
+import 'package:google_fonts/google_fonts.dart';
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -1751,12 +1760,15 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showSearchBar = false;
   final TextEditingController _searchController = TextEditingController();
   int _selectedIndex = 0;
+<<<<<<< HEAD
   String _userLocation = 'Fetching location...';
   List<String> savedLocations = [];
   String? selectedLocation;
 
   final TextEditingController _cityController = TextEditingController();
   final TextEditingController _streetController = TextEditingController();
+=======
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
 
   List<Map<String, dynamic>> services = [
     {"icon": Icons.tap_and_play, "title": "Plumber"},
@@ -1769,7 +1781,10 @@ class _HomeScreenState extends State<HomeScreen> {
     {"icon": Icons.bug_report, "title": "Pest Control"},
     {"icon": Icons.girl, "title": "Wall Panelling"},
     {"icon": Icons.wallpaper, "title": "Wall Panelling"},
+<<<<<<< HEAD
     {"icon": Icons.cleaning_services, "title": "Cleaner"},
+=======
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
   ];
   List<Map<String, dynamic>> filteredServices = [];
 
@@ -1777,6 +1792,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     filteredServices = services;
+<<<<<<< HEAD
     fetchUserLocation();
     loadSavedLocations();
   }
@@ -1831,6 +1847,8 @@ class _HomeScreenState extends State<HomeScreen> {
       print('Error fetching location: $e');
       setState(() => _userLocation = 'Error loading location');
     }
+=======
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
   }
 
   void _toggleSearchBar() {
@@ -1845,10 +1863,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _filterServices(String query) {
     setState(() {
+<<<<<<< HEAD
       filteredServices = services
           .where((service) =>
               service["title"].toLowerCase().contains(query.toLowerCase()))
           .toList();
+=======
+      if (query.isEmpty) {
+        filteredServices = services;
+      } else {
+        filteredServices =
+            services
+                .where(
+                  (service) => service["title"].toLowerCase().contains(
+                    query.toLowerCase(),
+                  ),
+                )
+                .toList();
+      }
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
     });
   }
 
@@ -1856,7 +1889,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (index == 1) {
       Navigator.push(
         context,
+<<<<<<< HEAD
         MaterialPageRoute(builder: (context) => EmergencyScreen()),
+=======
+        MaterialPageRoute(
+          builder: (context) => EmergencyScreen(),
+        ), // ✅ Navigate to Emergency
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
       );
     } else if (index == 2) {
       Navigator.push(
@@ -1871,6 +1910,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onServiceCardClicked(String serviceName) {
+<<<<<<< HEAD
     if (serviceName.toLowerCase() == 'plumber') {
       Navigator.push(
         context,
@@ -2026,6 +2066,35 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       print('Error updating location: $e');
+=======
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(serviceName),
+          content: Text('You clicked on the $serviceName service.'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _getScreen() {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildHomeScreen();
+      case 2:
+        return ProfileScreen();
+      default:
+        return _buildHomeScreen();
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
     }
   }
 
@@ -2034,6 +2103,7 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: EdgeInsets.all(10.0),
       child: Column(
         children: [
+<<<<<<< HEAD
           Align(
             alignment: Alignment.centerRight,
             child: _showSearchBar
@@ -2062,6 +2132,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     tooltip: 'Search Services',
                   ),
           ),
+=======
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
           SizedBox(height: 20),
           Expanded(
             child: GridView.builder(
@@ -2074,8 +2146,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               itemBuilder: (context, index) {
                 return GestureDetector(
+<<<<<<< HEAD
                   onTap: () =>
                       _onServiceCardClicked(filteredServices[index]["title"]),
+=======
+                  onTap:
+                      () => _onServiceCardClicked(
+                        filteredServices[index]["title"],
+                      ),
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
                   child: ServiceCard(
                     icon: filteredServices[index]["icon"],
                     title: filteredServices[index]["title"],
@@ -2094,6 +2173,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
+<<<<<<< HEAD
         title: Row(
           children: [
             Icon(Icons.room_service, color: Colors.black, size: 28),
@@ -2108,10 +2188,44 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+=======
+        title:
+            _showSearchBar
+                ? AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
+                  width: MediaQuery.of(context).size.width * 0.7,
+                  child: TextField(
+                    controller: _searchController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: "Search services...",
+                      border: InputBorder.none,
+                    ),
+                    onChanged: _filterServices,
+                  ),
+                )
+                : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.room_service, color: Colors.black, size: 37),
+                    SizedBox(width: 8),
+                    Text(
+                      "Skill-Link",
+                      style: GoogleFonts.poppins(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.cyan,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
         backgroundColor: Colors.white,
         foregroundColor: Colors.cyan,
         elevation: 0,
         actions: [
+<<<<<<< HEAD
           GestureDetector(
             onTap: _showLocationBottomSheet,
             child: Row(
@@ -2133,15 +2247,37 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: _selectedIndex == 0 ? _buildHomeScreen() : ProfileScreen(),
+=======
+          IconButton(
+            icon: Icon(
+              _showSearchBar ? Icons.close : Icons.search,
+              color: Colors.black,
+            ),
+            onPressed: _toggleSearchBar,
+          ),
+        ],
+      ),
+      body: _getScreen(),
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onTabSelected,
         selectedItemColor: Colors.blue,
         unselectedItemColor: Colors.grey,
+<<<<<<< HEAD
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(
             icon: Icon(Icons.emergency, color: Colors.red),
+=======
+        items: [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+          BottomNavigationBarItem(
+            icon: Icon(
+              Icons.emergency,
+              color: Colors.red, // 🔴 Always red
+            ),
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
             label: "Emergency",
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
@@ -2150,6 +2286,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+<<<<<<< HEAD
 
 class ServiceCard extends StatelessWidget {
   final IconData icon;
@@ -2175,3 +2312,5 @@ class ServiceCard extends StatelessWidget {
     );
   }
 }
+=======
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // import 'package:flutter/material.dart';
 // import 'package:plumber_project/pages/dashboard.dart';
 // import 'package:plumber_project/pages/emergency.dart';
@@ -424,14 +425,20 @@
 //     );
 //   }
 // }
+=======
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
 import 'package:flutter/material.dart';
 import 'package:plumber_project/pages/dashboard.dart';
 import 'package:plumber_project/pages/emergency.dart';
 import 'package:plumber_project/pages/login.dart';
+<<<<<<< HEAD
 import 'package:plumber_project/pages/notification.dart';
 import 'package:plumber_project/pages/privacy.dart';
 import 'package:plumber_project/pages/setting.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+=======
+import 'package:plumber_project/pages/setting.dart';
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -448,6 +455,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _phoneController = TextEditingController();
 
   final int _selectedIndex = 2;
+<<<<<<< HEAD
   String _userName = 'Loading...';
   String _userRole = ''; // To store the user's role
 
@@ -491,10 +499,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _onItemTapped(int index) {
     if (index == 1 && _userRole != 'plumber' && _userRole != 'electrician') {
+=======
+
+  void _onItemTapped(int index) {
+    if (index == 1) {
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => EmergencyScreen()),
       );
+<<<<<<< HEAD
     } else if (index == 1 &&
         (_userRole == 'plumber' || _userRole == 'electrician')) {
       Navigator.push(
@@ -503,6 +517,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           builder: (context) => NotificationsScreen(),
         ), // Replace Emergency with Notifications
       );
+=======
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
     } else if (index == 2) {
       Navigator.push(
         context,
@@ -516,11 +532,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+<<<<<<< HEAD
+=======
+  void _submitForm() {
+    if (_formKey.currentState!.validate()) {
+      // Form is valid, proceed with saving or sending data
+      // ScaffoldMessenger.of(
+      //   context,
+      // ).showSnackBar(SnackBar(content: Text('Profile updated successfully')));
+       Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+      );
+    }
+  }
+
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+<<<<<<< HEAD
         title: Text(" $_userName"),
+=======
+        title: Text("Profile"),
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
         backgroundColor: Colors.cyan,
         actions: [
           Builder(
@@ -549,7 +585,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               leading: Icon(Icons.edit),
               title: Text('Edit Profile'),
               onTap: () {
+<<<<<<< HEAD
                 Navigator.pop(context);
+=======
+                Navigator.pop(context); // Just close drawer here
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
               },
             ),
             ListTile(
@@ -558,6 +598,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: () {
                 Navigator.push(
                   context,
+<<<<<<< HEAD
                   MaterialPageRoute(builder: (context) => SettingsScreen()),
                 );
               },
@@ -570,11 +611,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   context,
                   MaterialPageRoute(builder: (context) => PrivacyTermsScreen()),
                 );
+=======
+                  MaterialPageRoute(builder: (context) => SettingsScreen()));
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
               },
             ),
             ListTile(
               leading: Icon(Icons.logout),
               title: Text('Logout'),
+<<<<<<< HEAD
               onTap: () async {
                 SharedPreferences prefs = await SharedPreferences.getInstance();
                 await prefs.remove('email');
@@ -587,6 +632,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   context,
                   MaterialPageRoute(builder: (context) => LoginScreen()),
                   (Route<dynamic> route) => false,
+=======
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => LoginScreen()),
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
                 );
               },
             ),
@@ -616,12 +667,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please enter your email';
                   }
+<<<<<<< HEAD
+=======
+                  // Basic email pattern check
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
                   if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
                     return 'Enter a valid email';
                   }
                   return null;
                 },
               ),
+<<<<<<< HEAD
+=======
+              TextFormField(
+                controller: _phoneController,
+                decoration: InputDecoration(labelText: 'Phone Number'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter your phone number';
+                  }
+                  return null;
+                },
+              ),
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
               SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _submitForm,
@@ -640,6 +708,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         items: [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(
+<<<<<<< HEAD
             icon:
                 _userRole == 'plumber' || _userRole == 'electrician'
                     ? Icon(
@@ -654,6 +723,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _userRole == 'plumber' || _userRole == 'electrician'
                     ? "Notifications" // Update label accordingly
                     : "Emergency",
+=======
+            icon: Icon(
+              Icons.emergency,
+              color: Colors.red, // 🔴 Always red
+            ),
+            label: "Emergency",
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],

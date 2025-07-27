@@ -24,7 +24,11 @@ android {
         applicationId = "com.example.plumber_project"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
+<<<<<<< HEAD
         minSdk = 24
+=======
+        minSdk = flutter.minSdkVersion
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

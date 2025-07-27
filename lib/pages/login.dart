@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // import 'package:flutter/material.dart';
 // import 'package:http/http.dart' as http;
 // import 'package:shared_preferences/shared_preferences.dart';
@@ -268,6 +269,13 @@ import 'package:plumber_project/pages/user_profile.dart';
 import 'package:plumber_project/pages/plumber_profile.dart';
 import 'signup_screen.dart';
 import 'Apis.dart'; // Make sure baseUrl is defined here
+=======
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'signup_screen.dart'; // Make sure you create this file
+import 'dashboard.dart'; // Your Dashboard screen
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -280,6 +288,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
+<<<<<<< HEAD
   bool _rememberMe = false;
 
   @override
@@ -378,6 +387,10 @@ class _LoginScreenState extends State<LoginScreen> {
   //   }
   // }
 
+=======
+
+  // Function to handle login
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
   Future<void> _handleLogin() async {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
@@ -392,13 +405,19 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+<<<<<<< HEAD
       // Step 1: Call login API
       final loginResponse = await http.post(
         Uri.parse('$baseUrl/api/login'),
+=======
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:8000/api/login'), // Your API endpoint
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
 
+<<<<<<< HEAD
       final loginData = jsonDecode(loginResponse.body);
 
       if (loginResponse.statusCode == 200 &&
@@ -497,6 +516,24 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       debugPrint('Exception during login: $e');
+=======
+      final data = jsonDecode(response.body);
+     if (response.statusCode == 200 && data.containsKey('access_token')) {
+       
+
+        // ✅ Navigate to Dashboard Screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+        );
+      } else {
+        _showAlert(
+          'Login Error',
+          data['message'] ?? 'Invalid email or password.',
+        );
+      }
+    } catch (e) {
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
       _showAlert('Login Error', 'Failed to connect to the server.');
     } finally {
       setState(() {
@@ -505,6 +542,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+<<<<<<< HEAD
   Future<bool> _checkUserProfile(int userId, String token) async {
     try {
       String url = '$baseUrl/api/check-profile/$userId';
@@ -541,12 +579,30 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
       ),
+=======
+  // Function to show alert dialogs
+  void _showAlert(String title, String message) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('OK'),
+              ),
+            ],
+          ),
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+<<<<<<< HEAD
       appBar: AppBar(
         title: const Text(
           'Skill-Link',
@@ -643,6 +699,85 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ],
           ),
+=======
+      backgroundColor: Colors.grey[200],
+      body: Padding(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Icon(Icons.lock, size: 80, color: Colors.black),
+            SizedBox(height: 20),
+
+            // Email Field
+            Text(
+              "Email",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            TextField(
+              controller: _emailController,
+              decoration: InputDecoration(
+                hintText: "Enter your email",
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.email),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+            ),
+            SizedBox(height: 10),
+
+            // Password Field
+            Text(
+              "Password",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            TextField(
+              controller: _passwordController,
+              decoration: InputDecoration(
+                hintText: "Enter your password",
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.lock),
+              ),
+              obscureText: true,
+            ),
+            SizedBox(height: 20),
+
+            // Login Button
+            ElevatedButton(
+              onPressed: _isLoading ? null : _handleLogin,
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.symmetric(vertical: 15),
+                textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              child: Text(_isLoading ? "Logging in..." : "Login"),
+            ),
+            SizedBox(height: 10),
+
+            // Signup Prompt
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text("Don't have an account?"),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => SignUpScreen()),
+                    );
+                  },
+                  child: Text(
+                    "Sign Up",
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
         ),
       ),
     );

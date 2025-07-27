@@ -4,7 +4,10 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   file_selector_linux
+<<<<<<< HEAD
   open_file_linux
+=======
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

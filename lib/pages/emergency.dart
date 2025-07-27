@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // import 'package:flutter/material.dart';
 
 // class EmergencyScreen extends StatelessWidget {
@@ -230,6 +231,8 @@
 //   }
 // }
 
+=======
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
 import 'package:flutter/material.dart';
 
 class EmergencyScreen extends StatelessWidget {
@@ -268,6 +271,7 @@ class EmergencyScreen extends StatelessWidget {
             ),
             trailing: Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () {
+<<<<<<< HEAD
               if (service["title"] == "Plumber") {
                 Navigator.push(
                   context,
@@ -296,6 +300,25 @@ class EmergencyScreen extends StatelessWidget {
                       ),
                 );
               }
+=======
+              // Optional: Show a dialog or navigate
+              showDialog(
+                context: context,
+                builder:
+                    (_) => AlertDialog(
+                      title: Text(service["title"]),
+                      content: Text(
+                        "You tapped on ${service["title"]} (Emergency)",
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text("OK"),
+                        ),
+                      ],
+                    ),
+              );
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
             },
           );
         },
@@ -304,6 +327,7 @@ class EmergencyScreen extends StatelessWidget {
     );
   }
 }
+<<<<<<< HEAD
 
 // ------------------ PLUMBER SECTION ------------------
 
@@ -437,3 +461,5 @@ class ElectricianSubServiceDetailPage extends StatelessWidget {
     );
   }
 }
+=======
+>>>>>>> 762f597040fe8b802e8b7d610046465852ef0654
