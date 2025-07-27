@@ -1,0 +1,1 @@
+// Sample content for lib/models/user_model.dart

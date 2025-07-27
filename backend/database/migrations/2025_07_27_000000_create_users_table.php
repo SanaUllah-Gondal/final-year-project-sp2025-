@@ -1,0 +1,1 @@
+// Sample content for database/migrations/2025_07_27_000000_create_users_table.php

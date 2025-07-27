@@ -1,0 +1,1 @@
+// Sample content for app/Http/Controllers/AuthController.php

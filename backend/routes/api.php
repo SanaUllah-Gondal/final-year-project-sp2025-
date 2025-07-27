@@ -1,0 +1,1 @@
+// Sample content for routes/api.php
