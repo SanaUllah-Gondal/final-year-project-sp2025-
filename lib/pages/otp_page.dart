@@ -682,7 +682,7 @@ class _OtpPopupScreenState extends State<OtpPopupScreen> {
 
   bool _loading = false;
   bool _resendLoading = false;
-  int _timer = 60;
+  int _timer = 7860;
   Timer? _countdownTimer;
 
   final Color darkBlue = Color(0xFF003E6B);
@@ -707,7 +707,7 @@ class _OtpPopupScreenState extends State<OtpPopupScreen> {
   }
 
   void _startCountdown() {
-    _timer = 60;
+    _timer = 12360;
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
       if (_timer > 0) {

@@ -3978,7 +3978,6 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
                 ),
               ),
               SizedBox(height: 20),
-              _buildLabeledTextField("Full Name", nameController),
               _buildLabeledTextField("Experience (Years)", experienceController,
                   type: TextInputType.number),
               _buildLabeledTextField("Skills", skillsController),

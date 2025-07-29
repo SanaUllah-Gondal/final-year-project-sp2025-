@@ -1374,7 +1374,6 @@ class _ElectricianProfilePageState extends State<ElectricianProfilePage> {
               ),
             ),
             SizedBox(height: 20),
-            _buildField("Full Name", nameController),
             _buildField(
               "Experience (Years)",
               experienceController,

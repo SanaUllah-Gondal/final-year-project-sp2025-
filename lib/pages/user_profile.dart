@@ -1249,7 +1249,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
               ),
             ),
             SizedBox(height: 20),
-            _buildLabeledTextField("Full Name", nameController),
             _buildLabeledTextField("Short Bio", bioController),
             _buildLabeledTextField(
               "Location",
