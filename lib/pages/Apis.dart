@@ -5,11 +5,11 @@ String getBaseUrl() {
     return 'http://localhost:8000'; // For web
   } else if (kDebugMode) {
     // For emulators and local testing
-    // return 'http://10.0.2.2:8000'; // Android emulator
+    return 'http://10.0.2.2:8000'; // Android emulator
     // return 'http://localhost:8000'; // iOS simulator
-    return 'http://192.168.1.103:8000'; // Replace with your actual LAN IP
+    return 'http://192.168.1.103:8000'; //  LAN IP
   } else {
-    // For physical devices - replace with your actual server IP
+    // server IP
     return 'http://192.168.1.100:8000';
   }
 }
