@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -84,11 +85,20 @@ class _LoginScreenState extends State<LoginScreen> {
       ).timeout(const Duration(seconds: 30));
 
       debugPrint('Response status code: ${response.statusCode}');
-      debugPrint('Response body: ${response.body}');
 
-      // Check if response is HTML (indicates server error)
-      if (response.body.trim().startsWith('<!DOCTYPE html>')) {
-        throw FormatException('Server returned HTML error page');
+      // Handle 500 errors specifically
+      if (response.statusCode == 500) {
+        throw HttpException('Server encountered an error (500)',
+            uri: Uri.parse(url));
+      }
+
+      // Check for HTML error pages
+      if (response.body.trim().startsWith('<!DOCTYPE html>') ||
+          response.body.trim().startsWith('<html')) {
+        throw FormatException('Server returned HTML error page. '
+            'This usually means the API endpoint is incorrect or the server is misconfigured.\n'
+            'Requested URL: $url\n'
+            'Status Code: ${response.statusCode}');
       }
 
       final data = jsonDecode(response.body);
@@ -98,18 +108,35 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         String errorMessage = data['error'] ??
             data['message'] ??
-            'Invalid credentials. Status code: ${response.statusCode}';
+            'Login failed with status code: ${response.statusCode}';
         _showAlert('Login Error', errorMessage);
       }
     } on FormatException catch (e) {
       debugPrint('FormatException: $e');
-      _showAlert('Server Error', 'Received unexpected response from server. Please check your API URL.');
+      _showAlert('Server Configuration Error',
+          'The server returned an unexpected response.\n\n'
+              'Please check:\n'
+              '1. API URL is correct\n'
+              '2. Server is running\n'
+              '3. CORS is configured\n\n'
+              'URL: $baseUrl/api/login');
     } on http.ClientException catch (e) {
       debugPrint('ClientException: $e');
-      _showAlert('Connection Error', 'Could not connect to the server. Please check your internet connection.');
+      _showAlert('Connection Error',
+          'Could not connect to the server.\n\n'
+              'Please check:\n'
+              '1. Your internet connection\n'
+              '2. Server URL is correct\n'
+              '3. Server is running');
     } on TimeoutException catch (e) {
       debugPrint('TimeoutException: $e');
-      _showAlert('Timeout Error', 'Connection timed out. Please try again.');
+      _showAlert('Timeout Error', 'Server took too long to respond. Please try again.');
+    } on HttpException catch (e) {
+      debugPrint('HttpException: $e');
+      _showAlert('Server Error',
+          'Server encountered an error (500).\n\n'
+              'This is a server-side issue. Please contact support.\n\n'
+              'Technical details:\n${e.message}');
     } catch (e) {
       debugPrint('Unexpected error: $e');
       _showAlert('Error', 'An unexpected error occurred: ${e.toString()}');
