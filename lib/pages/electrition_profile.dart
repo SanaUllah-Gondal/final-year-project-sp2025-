@@ -1124,6 +1124,7 @@ class _ElectricianProfilePageState extends State<ElectricianProfilePage> {
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     roleController.text = prefs.getString('role') ?? 'Unknown';
+    nameController.text=  prefs.getString('name')?? 'Unknown';
     _bearerToken = prefs.getString('bearer_token');
   }
 

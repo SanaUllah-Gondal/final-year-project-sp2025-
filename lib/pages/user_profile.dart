@@ -1021,6 +1021,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       roleController.text = prefs.getString('role') ?? 'Unknown';
+      nameController.text=  prefs.getString('name')?? 'Unknown';
       _bearerToken = prefs.getString('bearer_token');
     });
   }
