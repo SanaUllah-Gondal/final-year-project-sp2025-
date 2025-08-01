@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,7 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _rememberMe = false;
-
+  final _auth = FirebaseAuth.instance;
   final Color darkBlue = const Color(0xFF003E6B);
   final Color tealBlue = const Color(0xFF00A8A8);
 
@@ -36,6 +37,29 @@ class _LoginScreenState extends State<LoginScreen> {
     debugPrint('Initializing LoginScreen with baseUrl: $baseUrl');
   }
 
+
+
+  Future<void> loginWithEmailAndPassword(String email, String password) async {
+    try {
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+    } on FirebaseAuthException catch (e) { // Throw custom [message] variable
+      String message;
+      switch (e.code) {
+        case 'user-not-found':
+          message = 'No user found for that email.';
+          break;
+        case 'wrong-password':
+          message = 'Wrong password provided for that user.';
+          break;
+        default:
+          message = 'An unknown error occurred.';
+      }
+      throw message;
+    } catch (_) {
+      const message = 'Something went wrong. Please try again.';
+      throw message;
+    }
+  }
   void _loadUserData() async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -102,6 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['access_token'] != null) {
+        await  loginWithEmailAndPassword(email, password);
         await _handleSuccessfulLogin(data);
       } else {
         String errorMessage = data['error'] ??

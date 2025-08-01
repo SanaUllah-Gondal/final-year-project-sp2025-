@@ -302,6 +302,7 @@ import 'package:plumber_project/pages/authentication/otp_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -313,6 +314,7 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   final Color darkBlue = const Color(0xFF003E6B);
   final Color tealBlue = const Color(0xFF00A8A8);
+  final _auth = FirebaseAuth.instance;
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -323,6 +325,32 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isLoading = false;
   bool _isOtpVisible = false;
 
+
+
+  /// [EmailAuthentication] - REGISTER
+  Future<void> registerWithEmailAndPassword(
+      String email, String password) async {
+    try {
+      await _auth.createUserWithEmailAndPassword(
+          email: email, password: password);
+    } on FirebaseAuthException catch (e) { // Throw custom [message] variable
+      String message;
+      switch (e.code) {
+        case 'weak-password':
+          message = 'The password provided is too weak.';
+          break;
+        case 'email-already-in-use':
+          message = 'The account already exists for that email.';
+          break;
+        default:
+          message = 'An unknown error occurred.';
+      }
+      throw message;
+    } catch (_) {
+      const message = 'Something went wrong. Please try again.';
+      throw message;
+    }
+  }
   Future<void> _handleSignUp() async {
     String name = _nameController.text.trim();
     String email = _emailController.text.trim();
@@ -366,6 +394,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
+        await registerWithEmailAndPassword(email, password);
         setState(() => _isOtpVisible = true);
         Navigator.push(
           context,
