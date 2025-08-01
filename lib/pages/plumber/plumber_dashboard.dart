@@ -166,8 +166,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:plumber_project/pages/emergency.dart';
 import 'package:plumber_project/pages/plumber/plumberrequest.dart';
-import 'package:plumber_project/pages/plumber_dashboard_card.dart';
-import 'package:plumber_project/pages/profile.dart';
+import 'package:plumber_project/pages/plumber/plumber_dashboard_card.dart';
+import 'package:plumber_project/pages/users/profile.dart';
 import 'package:plumber_project/pages/notification.dart';
 
 final Color darkBlue = Color(0xFF003E6B);

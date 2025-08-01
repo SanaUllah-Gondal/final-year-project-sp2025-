@@ -49,6 +49,8 @@ dependencies:
   open_file: ^3.5.10
   device_info_plus: ^11.4.0
   flutter_typeahead: ^5.2.0
+  firebase_core: ^4.0.0
+  firebase_auth: ^6.0.0
   
 
 dev_dependencies:

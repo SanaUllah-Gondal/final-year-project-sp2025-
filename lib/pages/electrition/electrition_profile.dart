@@ -1090,7 +1090,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:plumber_project/pages/Apis.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:plumber_project/pages/electrition_dashboard.dart';
+import 'package:plumber_project/pages/electrition/electrition_dashboard.dart';
 
 class ElectricianProfilePage extends StatefulWidget {
   final VoidCallback? onSuccess;

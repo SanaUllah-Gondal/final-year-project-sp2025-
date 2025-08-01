@@ -265,12 +265,12 @@
 // }
 
 import 'package:flutter/material.dart';
-import 'package:plumber_project/pages/dashboard.dart'; // HomeScreen
-import 'package:plumber_project/pages/electrition_dashboard.dart';
+import 'package:plumber_project/pages/users/dashboard.dart'; // HomeScreen
+import 'package:plumber_project/pages/electrition/electrition_dashboard.dart';
 import 'package:plumber_project/pages/emergency.dart';
-import 'package:plumber_project/pages/login.dart';
+import 'package:plumber_project/pages/authentication/login.dart';
 import 'package:plumber_project/pages/notification.dart';
-import 'package:plumber_project/pages/plumber_dashboard.dart';
+import 'package:plumber_project/pages/plumber/plumber_dashboard.dart';
 import 'package:plumber_project/pages/privacy.dart';
 import 'package:plumber_project/pages/setting.dart';
 import 'package:shared_preferences/shared_preferences.dart';

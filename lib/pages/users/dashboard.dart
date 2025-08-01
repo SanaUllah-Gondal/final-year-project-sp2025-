@@ -3030,10 +3030,10 @@ import 'package:plumber_project/pages/Apis.dart';
 import 'package:plumber_project/pages/users/booking.dart';
 import 'package:plumber_project/pages/userservice/electricianservice.dart';
 import 'package:plumber_project/pages/userservice/plumberservice.dart';
-import 'service.dart';
-import 'setting.dart';
+import '../service.dart';
+import '../setting.dart';
 import 'profile.dart';
-import 'emergency.dart';
+import '../emergency.dart';
 
 final Color darkBlue = Color(0xFF003E6B);
 final Color tealBlue = Color(0xFF00A8A8);

@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:plumber_project/pages/Apis.dart';
-import 'package:plumber_project/pages/plumber_dashboard.dart';
+import 'package:plumber_project/pages/plumber/plumber_dashboard.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';

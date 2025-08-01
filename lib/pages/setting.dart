@@ -55,8 +55,8 @@
 
 
 import 'package:flutter/material.dart';
-import 'package:plumber_project/pages/dashboard.dart';
-import 'package:plumber_project/pages/profile.dart';
+import 'package:plumber_project/pages/users/dashboard.dart';
+import 'package:plumber_project/pages/users/profile.dart';
 import 'package:plumber_project/main.dart';
 
 class SettingsScreen extends StatefulWidget {

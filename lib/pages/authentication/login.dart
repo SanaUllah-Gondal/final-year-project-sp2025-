@@ -4,14 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:plumber_project/pages/dashboard.dart';
-import 'package:plumber_project/pages/electrition_dashboard.dart';
-import 'package:plumber_project/pages/plumber_dashboard.dart' as dash;
-import 'package:plumber_project/pages/electrition_profile.dart';
-import 'package:plumber_project/pages/user_profile.dart';
-import 'package:plumber_project/pages/plumber_profile.dart' as profile;
+import 'package:plumber_project/pages/users/dashboard.dart';
+import 'package:plumber_project/pages/electrition/electrition_dashboard.dart';
+import 'package:plumber_project/pages/plumber/plumber_dashboard.dart' as dash;
+import 'package:plumber_project/pages/electrition/electrition_profile.dart';
+import 'package:plumber_project/pages/users/user_profile.dart';
+import 'package:plumber_project/pages/plumber/plumber_profile.dart' as profile;
 import 'signup_screen.dart';
-import 'Apis.dart';
+import '../Apis.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

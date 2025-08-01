@@ -134,13 +134,13 @@ import 'dart:convert';
 
 import 'package:plumber_project/pages/splash.dart';
 import 'package:plumber_project/pages/theme.dart';
-import 'package:plumber_project/pages/login.dart';
-import 'package:plumber_project/pages/plumber_dashboard.dart' as dash;
-import 'package:plumber_project/pages/electrition_dashboard.dart';
-import 'package:plumber_project/pages/dashboard.dart';
-import 'package:plumber_project/pages/plumber_profile.dart' as profile;
-import 'package:plumber_project/pages/electrition_profile.dart';
-import 'package:plumber_project/pages/user_profile.dart';
+import 'package:plumber_project/pages/authentication/login.dart';
+import 'package:plumber_project/pages/plumber/plumber_dashboard.dart' as dash;
+import 'package:plumber_project/pages/electrition/electrition_dashboard.dart';
+import 'package:plumber_project/pages/users/dashboard.dart';
+import 'package:plumber_project/pages/plumber/plumber_profile.dart' as profile;
+import 'package:plumber_project/pages/electrition/electrition_profile.dart';
+import 'package:plumber_project/pages/users/user_profile.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

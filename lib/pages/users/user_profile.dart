@@ -976,7 +976,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:plumber_project/pages/dashboard.dart';
+import 'package:plumber_project/pages/users/dashboard.dart';
 
 class UserProfilePage extends StatefulWidget {
   final VoidCallback? onSuccess;

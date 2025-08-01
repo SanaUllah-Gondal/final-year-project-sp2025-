@@ -121,8 +121,8 @@ import 'package:flutter/material.dart';
 import 'package:plumber_project/pages/notification.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:plumber_project/pages/emergency.dart';
-import 'package:plumber_project/pages/electrition_cards.dart';
-import 'package:plumber_project/pages/profile.dart';
+import 'package:plumber_project/pages/electrition/electrition_widgets/electrition_cards.dart';
+import 'package:plumber_project/pages/users/profile.dart';
 
 class ElectricianDashboard extends StatefulWidget {
   @override
