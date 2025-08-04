@@ -47,13 +47,13 @@ class PrivacyTermsScreen extends StatelessWidget {
             const Text(
               '- You are at least 18 years of age.\n'
               '- You will use the app only for lawful services.\n'
-              '- You will treat all service providers with respect.\n'
+              '- You will treat all service controllers with respect.\n'
               '- You agree to pay the service provider the agreed amount for their services.',
               style: TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 20),
             const Text(
-              'Skill-Link is a platform that connects users to professionals but does not take responsibility for any disputes between users and service providers. We encourage honest reviews and fair dealings.',
+              'Skill-Link is a platform that connects users to professionals but does not take responsibility for any disputes between users and service controllers. We encourage honest reviews and fair dealings.',
               style: TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 30),

@@ -374,30 +374,3 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
   }
 }
 
-// ✅ Custom Plumber Dashboard with Gradient Background
-// class PlumberDashboard extends StatelessWidget {
-//   final Color darkBlue = const Color(0xFF003E6B);
-//   final Color tealBlue = const Color(0xFF00A8A8);
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       body: Container(
-//         decoration: BoxDecoration(
-//           gradient: LinearGradient(
-//             colors: [darkBlue, tealBlue],
-//             begin: Alignment.topCenter,
-//             end: Alignment.bottomCenter,
-//           ),
-//         ),
-//         child: Center(
-//           child: Text(
-//             'Welcome to the Plumber Dashboard',
-//             style: TextStyle(color: Colors.white, fontSize: 24),
-//             textAlign: TextAlign.center,
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }
