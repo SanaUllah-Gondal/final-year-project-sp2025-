@@ -1,6 +1,7 @@
-
+// lib/pages/plumber/plumber_dashboard.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:get/get.dart';
+import 'package:plumber_project/controllers/dashboard_controller.dart';
 import 'package:plumber_project/pages/emergency.dart';
 import 'package:plumber_project/pages/plumber/plumberrequest.dart';
 import 'package:plumber_project/pages/plumber/plumber_dashboard_card.dart';
@@ -10,62 +11,8 @@ import 'package:plumber_project/pages/notification.dart';
 final Color darkBlue = Color(0xFF003E6B);
 final Color tealBlue = Color(0xFF00A8A8);
 
-class PlumberDashboard extends StatefulWidget {
-  @override
-  _PlumberDashboardState createState() => _PlumberDashboardState();
-}
-
-class _PlumberDashboardState extends State<PlumberDashboard> {
-  int _selectedIndex = 0;
-  String _userRole = '';
-
-  final List<Widget> _pages = [
-    HomeContent(),
-    Center(
-        child: Text('Notifications Page',
-            style: TextStyle(fontSize: 20, color: Colors.white))),
-    Center(
-        child: Text('Profile Page',
-            style: TextStyle(fontSize: 20, color: Colors.white))),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUserRole();
-  }
-
-  Future<void> _loadUserRole() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _userRole = prefs.getString('role') ?? '';
-    });
-  }
-
-  void _onItemTapped(int index) {
-    if (index == 1) {
-      if (_userRole == 'plumber' || _userRole == 'electrician') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => NotificationsScreen()),
-        );
-      } else {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => EmergencyScreen()),
-        );
-      }
-    } else if (index == 2) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => ProfileScreen()),
-      );
-    } else {
-      setState(() {
-        _selectedIndex = index;
-      });
-    }
-  }
+class PlumberDashboard extends StatelessWidget {
+  final DashboardController _dashboardController = Get.find();
 
   @override
   Widget build(BuildContext context) {
@@ -84,21 +31,53 @@ class _PlumberDashboardState extends State<PlumberDashboard> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
       ),
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: Colors.yellow,
-        unselectedItemColor: Colors.white,
-        backgroundColor: tealBlue,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.notifications), label: 'Notifications'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
+      body: Obx(() => _pages[_dashboardController.selectedIndex.value]),
+      bottomNavigationBar: Obx(
+            () => BottomNavigationBar(
+          currentIndex: _dashboardController.selectedIndex.value,
+          onTap: (index) => _onItemTapped(index, context),
+          selectedItemColor: Colors.yellow,
+          unselectedItemColor: Colors.white,
+          backgroundColor: tealBlue,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.notifications), label: 'Notifications'),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          ],
+        ),
       ),
     );
+  }
+
+  final List<Widget> _pages = [
+    HomeContent(),
+    NotificationsScreen(),
+    ProfileScreen(),
+  ];
+
+  void _onItemTapped(int index, BuildContext context) {
+    if (index == 1) {
+      if (_dashboardController.userRole.value == 'plumber' ||
+          _dashboardController.userRole.value == 'electrician') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => NotificationsScreen()),
+        );
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => EmergencyScreen()),
+        );
+      }
+    } else if (index == 2) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => ProfileScreen()),
+      );
+    } else {
+      _dashboardController.updateTabIndex(index);
+    }
   }
 }
 

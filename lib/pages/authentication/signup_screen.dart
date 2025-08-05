@@ -222,6 +222,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       DropdownMenuItem(
                           value: 'electrician', child: Text("Electrician")),
                       DropdownMenuItem(value: 'user', child: Text("Customer")),
+                      DropdownMenuItem(value: 'cleaner', child: Text("Cleaner")),
                     ],
                     onChanged: (value) => setState(() => _selectedRole = value),
                     hint: const Text("Select your role"),

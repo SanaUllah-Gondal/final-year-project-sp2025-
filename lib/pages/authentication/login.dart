@@ -1,16 +1,13 @@
+// lib/pages/authentication/login.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:plumber_project/pages/users/dashboard.dart';
-import 'package:plumber_project/pages/electrition/electrition_dashboard.dart';
-import 'package:plumber_project/pages/plumber/plumber_dashboard.dart' as dash;
-import 'package:plumber_project/pages/electrition/electrition_profile.dart';
-import 'package:plumber_project/pages/users/user_profile.dart';
-import 'package:plumber_project/pages/plumber/plumber_profile.dart' as profile;
+import 'package:plumber_project/controllers/dashboard_controller.dart';
 import 'signup_screen.dart';
 import '../Apis.dart';
 
@@ -30,6 +27,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final Color darkBlue = const Color(0xFF003E6B);
   final Color tealBlue = const Color(0xFF00A8A8);
 
+  final DashboardController _dashboardController = Get.put(DashboardController());
+
   @override
   void initState() {
     super.initState();
@@ -37,12 +36,10 @@ class _LoginScreenState extends State<LoginScreen> {
     debugPrint('Initializing LoginScreen with baseUrl: $baseUrl');
   }
 
-
-
   Future<void> loginWithEmailAndPassword(String email, String password) async {
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
-    } on FirebaseAuthException catch (e) { // Throw custom [message] variable
+    } on FirebaseAuthException catch (e) {
       String message;
       switch (e.code) {
         case 'user-not-found':
@@ -60,6 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
       throw message;
     }
   }
+
   void _loadUserData() async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -108,13 +106,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
       debugPrint('Response status code: ${response.statusCode}');
 
-      // Handle 500 errors specifically
       if (response.statusCode == 500) {
         throw HttpException('Server encountered an error (500)',
             uri: Uri.parse(url));
       }
 
-      // Check for HTML error pages
       if (response.body.trim().startsWith('<!DOCTYPE html>') ||
           response.body.trim().startsWith('<html')) {
         throw FormatException('Server returned HTML error page. '
@@ -126,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['access_token'] != null) {
-        await  loginWithEmailAndPassword(email, password);
+        await loginWithEmailAndPassword(email, password);
         await _handleSuccessfulLogin(data);
       } else {
         String errorMessage = data['error'] ??
@@ -186,26 +182,35 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setString('email', user['email']);
       await prefs.setBool('remember_me', _rememberMe);
 
+      // Set user role in dashboard controller
+      _dashboardController.setUserRole(role);
+
       // Check profile status
       bool hasProfile = await _checkUserProfile(token, userId, role, prefs);
 
-      // Navigate to appropriate screen
-      Widget destinationPage;
-      if (role == 'plumber') {
-        destinationPage = hasProfile
-            ? dash.PlumberDashboard()
-            : profile.PlumberProfilePage();
-      } else if (role == 'electrician') {
-        destinationPage =
-        hasProfile ? ElectricianDashboard() : ElectricianProfilePage();
-      } else {
-        destinationPage = hasProfile ? HomeScreen() : UserProfilePage();
-      }
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => destinationPage),
-      );
+
+
+      // Navigate to appropriate screen
+      if (role == 'plumber') {
+        if (hasProfile) {
+          Get.offAllNamed('/plumber/dashboard');
+        } else {
+          Get.offAllNamed('/plumber/profile');
+        }
+      } else if (role == 'electrician') {
+        if (hasProfile) {
+          Get.offAllNamed('/electrician/dashboard');
+        } else {
+          Get.offAllNamed('/electrician/profile');
+        }
+      } else {
+        if (hasProfile) {
+          Get.offAllNamed('/home');
+        } else {
+          Get.offAllNamed('/profile');
+        }
+      }
     } catch (e) {
       debugPrint('Error handling successful login: $e');
       _showAlert('Error', 'Failed to complete login process.');
@@ -230,6 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (profileResponse.statusCode == 200) {
         final profileData = jsonDecode(profileResponse.body);
+        await prefs.setBool('hasProfile',true);
 
         if (profileData['success'] == true && profileData['profile'] != null) {
           final profile = profileData['profile'];

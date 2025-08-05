@@ -1,42 +1,59 @@
 // lib/controllers/auth_controller.dart
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:plumber_project/services/storage_service.dart';
-import 'package:plumber_project/routes/app_pages.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../pages/authentication/auth_service.dart';
+import '../services/storage_service.dart';
 
 class AuthController extends GetxController {
-  final AuthService _authService = Get.find();
-  final StorageService _storageService = Get.find();
-
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final RxBool isLoading = false.obs;
   final RxBool isLoggedIn = false.obs;
   final RxString role = ''.obs;
   final RxBool hasProfile = false.obs;
-  final RxString token = ''.obs;
-  final RxInt userId = 0.obs;
+  final StorageService _storageService = Get.find();
+
 
   @override
-  void onReady() {
-    checkLoginStatus();
-    super.onReady();
+  void onInit() {
+    super.onInit();
+    _loadAuthData();
+    _checkLoginStatus();
   }
+  Future<void> checkLoginStatus() async => _checkLoginStatus();
 
-  Future<void> checkLoginStatus() async {
+  Future<void> _loadAuthData() async {
+    isLoading.value = true;
+
+    final prefs = await SharedPreferences.getInstance();
+
+    // Check Firebase login
+    final user = _auth.currentUser;
+    isLoggedIn.value = user != null;
+
+    // Restore role and hasProfile from prefs if available
+    role.value = prefs.getString('role') ?? '';
+    hasProfile.value = prefs.containsKey('${role.value}_profile_id');
+
+    isLoading.value = false;
+  }
+  Future<void> _checkLoginStatus() async {
     try {
       isLoading.value = true;
 
-      // Load from local storage
-      await _loadLocalData();
+      // Check Firebase auth state
+      User? firebaseUser = _auth.currentUser;
 
-      // Verify Firebase auth
-      await _verifyFirebaseAuth();
+      // Check local storage
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('bearer_token');
+      final storedRole = prefs.getString('role');
 
-      // Redirect if logged in
-      if (isLoggedIn.value) {
-        _redirectBasedOnRole();
-      }
+      isLoggedIn.value = firebaseUser != null && token != null;
+      role.value = storedRole ?? '';
+      hasProfile.value = prefs.getBool('has_profile') ?? false;
+      print("hass profileeeeeeeeeeehas $hasProfile.value");
+
     } catch (e) {
       Get.snackbar('Error', 'Failed to check login status');
     } finally {
@@ -44,102 +61,41 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<void> _loadLocalData() async {
-    token.value = await _storageService.getToken() ?? '';
-    role.value = await _storageService.getRole() ?? '';
-    userId.value = await _storageService.getUserId() ?? 0;
-    hasProfile.value = await _storageService.getHasProfile() ?? false;
-  }
-
-  Future<void> _verifyFirebaseAuth() async {
-    final firebaseUser = FirebaseAuth.instance.currentUser;
-    isLoggedIn.value = token.value.isNotEmpty && firebaseUser != null;
-  }
-
   Future<void> login(String email, String password) async {
     try {
       isLoading.value = true;
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
 
-      // Laravel login
-      final response = await _authService.loginWithLaravel(email, password);
+      // Save to shared preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_logged_in', true);
 
-      // Firebase login
-      await _authService.loginWithFirebase(email, password);
-
-      // Save user data
-      await _saveUserData(response, email);
-
-      // Check profile status
-      await _checkAndUpdateProfileStatus(response);
-
-      // Redirect
-      _redirectBasedOnRole();
+      isLoggedIn.value = true;
     } catch (e) {
-      Get.snackbar(
-        'Login Error',
-        e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-      );
       rethrow;
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> _saveUserData(Map<String, dynamic> response, String email) async {
-    await _storageService.saveUserData(
-      token: response['access_token'],
-      role: response['user']['role'],
-      userId: response['user']['id'],
-      email: email,
-    );
-    await _loadLocalData(); // Refresh local data
-  }
-
-  Future<void> _checkAndUpdateProfileStatus(Map<String, dynamic> response) async {
-    final profileStatus = await _authService.checkUserProfile(
-      response['access_token'],
-      response['user']['id'],
-      response['user']['role'],
-    );
-    await _storageService.setHasProfile(profileStatus);
-    hasProfile.value = profileStatus;
-  }
-
-  void _redirectBasedOnRole() {
-    if (!isLoggedIn.value) return;
-
-    String route;
-    switch (role.value) {
-      case 'plumber':
-        route = hasProfile.value
-            ? AppRoutes.PLUMBER_DASHBOARD
-            : AppRoutes.PLUMBER_PROFILE;
-        break;
-      case 'electrician':
-        route = hasProfile.value
-            ? AppRoutes.ELECTRICIAN_DASHBOARD
-            : AppRoutes.ELECTRICIAN_PROFILE;
-        break;
-      default:
-        route = hasProfile.value
-            ? AppRoutes.HOME
-            : AppRoutes.PROFILE;
-    }
-    Get.offAllNamed(route);
-  }
-
   Future<void> logout() async {
     try {
       isLoading.value = true;
-      await _authService.logout();
-      await _storageService.clearAll();
+      await _auth.signOut();
+
+      // Clear shared preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
       isLoggedIn.value = false;
-      Get.offAllNamed(AppRoutes.LOGIN);
+      role.value = '';
+      hasProfile.value = false;
     } catch (e) {
-      Get.snackbar('Logout Error', 'Failed to logout');
+      Get.snackbar('Error', 'Failed to logout');
     } finally {
       isLoading.value = false;
     }
   }
 }
+
+

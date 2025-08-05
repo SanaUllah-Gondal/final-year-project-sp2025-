@@ -1,37 +1,67 @@
-
-
+// lib/pages/electrition/electrition_dashboard.dart
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:plumber_project/controllers/dashboard_controller.dart';
 import 'package:plumber_project/pages/notification.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:plumber_project/pages/emergency.dart';
 import 'package:plumber_project/pages/electrition/electrition_widgets/electrition_cards.dart';
 import 'package:plumber_project/pages/users/profile.dart';
 
-class ElectricianDashboard extends StatefulWidget {
-  @override
-  _ElectricianDashboardState createState() => _ElectricianDashboardState();
-}
-
-class _ElectricianDashboardState extends State<ElectricianDashboard> {
-  int _selectedIndex = 0;
-  String _userRole = '';
+class ElectricianDashboard extends StatelessWidget {
+  final DashboardController _dashboardController = Get.find();
 
   @override
-  void initState() {
-    super.initState();
-    _loadUserRole();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      drawer: Drawer(
+        child: ListView(
+          children: [
+            DrawerHeader(
+              child: Obx(() => Text(
+                "Welcome, ${_dashboardController.userRole.value.isNotEmpty ?
+                _dashboardController.userRole.value[0].toUpperCase() +
+                    _dashboardController.userRole.value.substring(1) : "User"}!",
+                style: TextStyle(color: Colors.white, fontSize: 20),
+              )),
+              decoration: BoxDecoration(color: Colors.indigo),
+            ),
+            ListTile(leading: Icon(Icons.dashboard), title: Text("Dashboard")),
+            ListTile(leading: Icon(Icons.settings), title: Text("Settings")),
+            ListTile(leading: Icon(Icons.logout), title: Text("Logout")),
+          ],
+        ),
+      ),
+      appBar: AppBar(title: Text("Electrician Dashboard")),
+      body: Obx(() => _pages[_dashboardController.selectedIndex.value]),
+      bottomNavigationBar: Obx(
+            () => BottomNavigationBar(
+          currentIndex: _dashboardController.selectedIndex.value,
+          onTap: (index) => _onItemTapped(index, context),
+          selectedItemColor: Colors.indigo,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.warning),
+              label: 'Emergency',
+            ),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          ],
+        ),
+      ),
+    );
   }
 
-  Future<void> _loadUserRole() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _userRole = prefs.getString('role') ?? ''; // e.g., 'electrician'
-    });
-  }
+  final List<Widget> _pages = [
+    HomeContent(),
+    EmergencyScreen(),
+    ProfileScreen(),
+  ];
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index, BuildContext context) {
     if (index == 1) {
-      if (_userRole == 'plumber' || _userRole == 'electrician') {
+      if (_dashboardController.userRole.value == 'plumber' ||
+          _dashboardController.userRole.value == 'electrician') {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => NotificationsScreen()),
@@ -48,54 +78,9 @@ class _ElectricianDashboardState extends State<ElectricianDashboard> {
         MaterialPageRoute(builder: (context) => ProfileScreen()),
       );
     } else {
-      setState(() {
-        _selectedIndex = index;
-      });
+      _dashboardController.updateTabIndex(index);
     }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: Drawer(
-        child: ListView(
-          children: [
-            DrawerHeader(
-              child: Text(
-                "Welcome, ${_userRole.isNotEmpty ? _userRole[0].toUpperCase() + _userRole.substring(1) : "User"}!",
-                style: TextStyle(color: Colors.white, fontSize: 20),
-              ),
-              decoration: BoxDecoration(color: Colors.indigo),
-            ),
-            ListTile(leading: Icon(Icons.dashboard), title: Text("Dashboard")),
-            ListTile(leading: Icon(Icons.settings), title: Text("Settings")),
-            ListTile(leading: Icon(Icons.logout), title: Text("Logout")),
-          ],
-        ),
-      ),
-      appBar: AppBar(title: Text("Electrician Dashboard")),
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: Colors.indigo,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.warning),
-            label: 'Emergency',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
-      ),
-    );
-  }
-
-  final List<Widget> _pages = [
-    HomeContent(),
-    Center(child: Text('Emergency Alerts', style: TextStyle(fontSize: 20))),
-    Center(child: Text('Profile Page', style: TextStyle(fontSize: 20))),
-  ];
 }
 
 class HomeContent extends StatelessWidget {
