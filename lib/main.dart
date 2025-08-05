@@ -11,7 +11,7 @@ import 'firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // Make sure you have this configured
+    options: DefaultFirebaseOptions.currentPlatform,
   );
   runApp(MyApp());
 }
@@ -32,4 +32,4 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-// Add this to your main widget (or create a new widget for it)
+
