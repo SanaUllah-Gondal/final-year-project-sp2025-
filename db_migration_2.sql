@@ -1,0 +1,1 @@
+// Placeholder for db_migration_2.sql

@@ -1,0 +1,1 @@
+// Placeholder for booking_page_8.blade.php
