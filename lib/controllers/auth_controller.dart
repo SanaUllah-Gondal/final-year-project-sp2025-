@@ -1,8 +1,10 @@
 // lib/controllers/auth_controller.dart
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../pages/authentication/login.dart';
 import '../services/storage_service.dart';
 
 class AuthController extends GetxController {
@@ -80,18 +82,38 @@ class AuthController extends GetxController {
 
   Future<void> logout() async {
     try {
+      // 1. Set loading state
       isLoading.value = true;
-      await _auth.signOut();
 
-      // Clear shared preferences
+      // 2. Perform logout operations
+      await _auth.signOut();
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
 
-      isLoggedIn.value = false;
-      role.value = '';
-      hasProfile.value = false;
-    } catch (e) {
-      Get.snackbar('Error', 'Failed to logout');
+      // 3. Nuclear reset - clears EVERYTHING
+      await Get.deleteAll(force: true);  // Force delete all controllers
+      Get.reset();  // Reset all GetX dependencies
+
+      // 4. Navigate to login and COMPLETELY reset app state
+      Get.offAll(
+            () => LoginScreen(),
+        routeName: '/login',
+        predicate: (route) => false,  // Remove ALL routes
+        arguments: {'fromLogout': true},  // Optional: identify logout navigation
+      );
+
+      // 5. Reset local state after a microtask delay
+      Future.microtask(() {
+        isLoggedIn.value = false;
+        role.value = '';
+        hasProfile.value = false;
+        isLoading.value = false;
+      });
+
+    } catch (e, stack) {
+      debugPrint('Logout error: $e\n$stack');
+      // Fallback - ensure we get to login screen no matter what
+      Get.offAllNamed('/login');
     } finally {
       isLoading.value = false;
     }

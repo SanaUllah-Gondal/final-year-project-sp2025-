@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -11,6 +12,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:plumber_project/pages/Apis.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:plumber_project/pages/cleaner/cleaner_dashboard.dart';
+
+import '../authentication/login.dart';
 
 class CleanerProfilePage extends StatefulWidget {
   final VoidCallback? onSuccess;
@@ -47,7 +50,22 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
     nameController.text = prefs.getString('name') ?? 'Unknown';
     _bearerToken = prefs.getString('bearer_token');
   }
+  Future<void> _navigateToLogin() async {
+    try {
+      // Clear any existing data
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
 
+      // Reset all GetX controllers and state
+      Get.offAll(
+            () => LoginScreen(),
+        routeName: '/login',
+        predicate: (route) => false, // Remove all routes
+      );
+    } catch (e) {
+      debugPrint('Error navigating to login: $e');
+    }
+  }
   Future<void> _getLocationAndAddress() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -173,7 +191,7 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
       return;
     }
 
-    final url = Uri.parse('$baseUrl/api/cleaner-profile/');
+    final url = Uri.parse('$baseUrl/api/profile/');
     final request = http.MultipartRequest('POST', url);
     request.headers['Authorization'] = 'Bearer $_bearerToken';
 
@@ -252,18 +270,26 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Cleaner Profile Setup',
-          style: TextStyle(color: Colors.white),
-        ),
-        backgroundColor: Colors.teal,
-        iconTheme: IconThemeData(color: Colors.white),
-      ),
+    return WillPopScope(
+        onWillPop: () async {
+          await _navigateToLogin();
+          return false; // Prevent default back button behavior
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(
+              'Cleaner Profile Setup',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.teal,
+            iconTheme: IconThemeData(color: Colors.white),
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back),
+              onPressed: _navigateToLogin,
+            ),
+          ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -340,6 +366,7 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
           ],
         ),
       ),
+    )
     );
   }
 }

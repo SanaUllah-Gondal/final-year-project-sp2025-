@@ -182,42 +182,28 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setString('email', user['email']);
       await prefs.setBool('remember_me', _rememberMe);
 
-      // Set user role in dashboard controller
-      _dashboardController.setUserRole(role);
-
       // Check profile status
       bool hasProfile = await _checkUserProfile(token, userId, role, prefs);
+      debugPrint('Final navigation decision - hasProfile: $hasProfile');
 
-      // Navigate to appropriate screen
+      // Navigate based on role and profile status
+      String route;
       switch (role.toLowerCase()) {
         case 'plumber':
-          if (hasProfile) {
-            Get.offAllNamed('/plumber/dashboard');
-          } else {
-            Get.offAllNamed('/plumber/profile');
-          }
+          route = hasProfile ? '/plumber/dashboard' : '/plumber/profile';
           break;
         case 'electrician':
-          if (hasProfile) {
-            Get.offAllNamed('/electrician/dashboard');
-          } else {
-            Get.offAllNamed('/electrician/profile');
-          }
+          route = hasProfile ? '/electrician/dashboard' : '/electrician/profile';
           break;
         case 'cleaner':
-          if (hasProfile) {
-            Get.offAllNamed('/cleaner/dashboard');
-          } else {
-            Get.offAllNamed('/cleaner/profile');
-          }
+          route = hasProfile ? '/cleaner/dashboard' : '/cleaner/profile';
           break;
         default:
-          if (hasProfile) {
-            Get.offAllNamed('/home');
-          } else {
-            Get.offAllNamed('/profile');
-          }
+          route = hasProfile ? '/home' : '/profile';
       }
+
+      debugPrint('Navigating to: $route');
+      Get.offAllNamed(route);
     } catch (e) {
       debugPrint('Error handling successful login: $e');
       _showAlert('Error', 'Failed to complete login process.');
@@ -242,46 +228,57 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (profileResponse.statusCode == 200) {
         final profileData = jsonDecode(profileResponse.body);
-        await prefs.setBool('hasProfile', true);
 
-        if (profileData['success'] == true && profileData['profile'] != null) {
-          final profile = profileData['profile'];
-          bool hasProfile = false;
+        // First reset hasProfile to false
+        await prefs.setBool('hasProfile', false);
+        bool hasProfile = false;
 
-          switch (role.toLowerCase()) {
-            case 'plumber':
-              if (profile['plumber_profile'] != null) {
-                hasProfile = true;
-                await prefs.setInt('plumber_profile_id', profile['plumber_profile']['id']);
-              }
-              break;
-            case 'electrician':
-              if (profile['electrician_profile'] != null) {
-                hasProfile = true;
-                await prefs.setInt('electrician_profile_id', profile['electrician_profile']['id']);
-              }
-              break;
-            case 'cleaner':
-              if (profile['cleaner_profile'] != null) {
-                hasProfile = true;
-                await prefs.setInt('cleaner_profile_id', profile['cleaner_profile']['id']);
-              }
-              break;
-            case 'user':
-              if (profile['user_profile'] != null) {
-                hasProfile = true;
-                await prefs.setInt('user_profile_id', profile['user_profile']['id']);
-              }
-              break;
+        if (profileData['success'] == true) {
+          if (profileData['profile_exists'] == true && profileData['profile'] != null) {
+            final profile = profileData['profile'];
+
+            switch (role.toLowerCase()) {
+              case 'plumber':
+                hasProfile = profile['plumber_profile'] != null;
+                if (hasProfile) {
+                  await prefs.setInt('plumber_profile_id', profile['plumber_profile']['id']);
+                }
+                break;
+              case 'electrician':
+                hasProfile = profile['electrician_profile'] != null;
+                if (hasProfile) {
+                  await prefs.setInt('electrician_profile_id', profile['electrician_profile']['id']);
+                }
+                break;
+              case 'cleaner':
+                hasProfile = profile['cleaner_profile'] != null;
+                if (hasProfile) {
+                  await prefs.setInt('cleaner_profile_id', profile['cleaner_profile']['id']);
+                }
+                break;
+              case 'user':
+                hasProfile = profile['user_profile'] != null;
+                if (hasProfile) {
+                  await prefs.setInt('user_profile_id', profile['user_profile']['id']);
+                }
+                break;
+            }
           }
-
-          await prefs.setString('profile_data', jsonEncode(profile));
-          return hasProfile;
         }
+
+        // Save the final profile status
+        await prefs.setBool('hasProfile', hasProfile);
+        if (profileData['profile'] != null) {
+          await prefs.setString('profile_data', jsonEncode(profileData['profile']));
+        }
+
+        debugPrint('Final hasProfile value: $hasProfile');
+        return hasProfile;
       }
       return false;
     } catch (e) {
       debugPrint('Error checking profile: $e');
+      await prefs.setBool('hasProfile', false);
       return false;
     }
   }
