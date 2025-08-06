@@ -82,7 +82,7 @@ class AuthService extends GetxService {
         final profile = profileData['profile'] ?? {};
 
         bool hasProfile = false;
-        switch (role) {
+        switch (role.toLowerCase()) {
           case 'plumber':
             if (profile['plumber_profile'] != null) {
               await prefs.setInt('plumber_profile_id', profile['plumber_profile']['id']);
@@ -92,6 +92,12 @@ class AuthService extends GetxService {
           case 'electrician':
             if (profile['electrician_profile'] != null) {
               await prefs.setInt('electrician_profile_id', profile['electrician_profile']['id']);
+              hasProfile = true;
+            }
+            break;
+          case 'cleaner':
+            if (profile['cleaner_profile'] != null) {
+              await prefs.setInt('cleaner_profile_id', profile['cleaner_profile']['id']);
               hasProfile = true;
             }
             break;
@@ -116,7 +122,16 @@ class AuthService extends GetxService {
   }
 
   Future<void> logout() async {
-    await _firebaseAuth.signOut();
+    try {
+      await _firebaseAuth.signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error during logout: $e');
+      }
+      throw 'Failed to logout: ${e.toString()}';
+    }
   }
 
   String _firebaseErrorToMessage(FirebaseAuthException e) {
@@ -127,8 +142,24 @@ class AuthService extends GetxService {
         return 'Wrong password provided.';
       case 'user-disabled':
         return 'This account has been disabled.';
+      case 'invalid-email':
+        return 'The email address is invalid.';
+      case 'too-many-requests':
+        return 'Too many requests. Try again later.';
+      case 'operation-not-allowed':
+        return 'Email/password accounts are not enabled.';
       default:
         return 'Authentication failed: ${e.message}';
     }
+  }
+
+  // Additional cleaner-specific methods
+  Future<bool> checkCleanerProfileExists(String token, int userId) async {
+    return checkUserProfile(token, userId, 'cleaner');
+  }
+
+  Future<void> saveCleanerProfileId(int profileId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('cleaner_profile_id', profileId);
   }
 }
