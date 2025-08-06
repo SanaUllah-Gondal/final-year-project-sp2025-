@@ -75,6 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+
   Future<void> _handleLogin() async {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
@@ -163,7 +164,6 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = false);
     }
   }
-
   Future<void> _handleSuccessfulLogin(Map<String, dynamic> data) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -188,28 +188,35 @@ class _LoginScreenState extends State<LoginScreen> {
       // Check profile status
       bool hasProfile = await _checkUserProfile(token, userId, role, prefs);
 
-
-
-
       // Navigate to appropriate screen
-      if (role == 'plumber') {
-        if (hasProfile) {
-          Get.offAllNamed('/plumber/dashboard');
-        } else {
-          Get.offAllNamed('/plumber/profile');
-        }
-      } else if (role == 'electrician') {
-        if (hasProfile) {
-          Get.offAllNamed('/electrician/dashboard');
-        } else {
-          Get.offAllNamed('/electrician/profile');
-        }
-      } else {
-        if (hasProfile) {
-          Get.offAllNamed('/home');
-        } else {
-          Get.offAllNamed('/profile');
-        }
+      switch (role.toLowerCase()) {
+        case 'plumber':
+          if (hasProfile) {
+            Get.offAllNamed('/plumber/dashboard');
+          } else {
+            Get.offAllNamed('/plumber/profile');
+          }
+          break;
+        case 'electrician':
+          if (hasProfile) {
+            Get.offAllNamed('/electrician/dashboard');
+          } else {
+            Get.offAllNamed('/electrician/profile');
+          }
+          break;
+        case 'cleaner':
+          if (hasProfile) {
+            Get.offAllNamed('/cleaner/dashboard');
+          } else {
+            Get.offAllNamed('/cleaner/profile');
+          }
+          break;
+        default:
+          if (hasProfile) {
+            Get.offAllNamed('/home');
+          } else {
+            Get.offAllNamed('/profile');
+          }
       }
     } catch (e) {
       debugPrint('Error handling successful login: $e');
@@ -235,21 +242,37 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (profileResponse.statusCode == 200) {
         final profileData = jsonDecode(profileResponse.body);
-        await prefs.setBool('hasProfile',true);
+        await prefs.setBool('hasProfile', true);
 
         if (profileData['success'] == true && profileData['profile'] != null) {
           final profile = profileData['profile'];
           bool hasProfile = false;
 
-          if (role == 'plumber' && profile['plumber_profile'] != null) {
-            hasProfile = true;
-            await prefs.setInt('plumber_profile_id', profile['plumber_profile']['id']);
-          } else if (role == 'electrician' && profile['electrician_profile'] != null) {
-            hasProfile = true;
-            await prefs.setInt('electrician_profile_id', profile['electrician_profile']['id']);
-          } else if (role == 'user' && profile['user_profile'] != null) {
-            hasProfile = true;
-            await prefs.setInt('user_profile_id', profile['user_profile']['id']);
+          switch (role.toLowerCase()) {
+            case 'plumber':
+              if (profile['plumber_profile'] != null) {
+                hasProfile = true;
+                await prefs.setInt('plumber_profile_id', profile['plumber_profile']['id']);
+              }
+              break;
+            case 'electrician':
+              if (profile['electrician_profile'] != null) {
+                hasProfile = true;
+                await prefs.setInt('electrician_profile_id', profile['electrician_profile']['id']);
+              }
+              break;
+            case 'cleaner':
+              if (profile['cleaner_profile'] != null) {
+                hasProfile = true;
+                await prefs.setInt('cleaner_profile_id', profile['cleaner_profile']['id']);
+              }
+              break;
+            case 'user':
+              if (profile['user_profile'] != null) {
+                hasProfile = true;
+                await prefs.setInt('user_profile_id', profile['user_profile']['id']);
+              }
+              break;
           }
 
           await prefs.setString('profile_data', jsonEncode(profile));

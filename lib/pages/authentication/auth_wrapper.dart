@@ -3,10 +3,12 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:plumber_project/controllers/auth_controller.dart';
 import 'package:plumber_project/pages/authentication/login.dart';
-import 'package:plumber_project/pages/electrition/electrition_profile.dart';
+import '../electrition/electrition_profile.dart';
 import '../electrition/electrition_dashboard.dart';
 import '../plumber/plumber_dashboard.dart';
 import '../plumber/plumber_profile.dart';
+import '../cleaner/cleaner_dashboard.dart'; // Add this import
+import '../cleaner/cleaner_profile.dart'; // Add this import
 import '../users/dashboard.dart';
 import '../users/profile.dart';
 
@@ -52,7 +54,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Widget _buildRoleBasedScreen() {
-    switch (_authController.role.value) {
+    switch (_authController.role.value.toLowerCase()) { // Make case-insensitive
       case 'plumber':
         return _authController.hasProfile.value
             ? PlumberDashboard()
@@ -61,6 +63,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
         return _authController.hasProfile.value
             ? ElectricianDashboard()
             : ElectricianProfilePage();
+      case 'cleaner': // Add cleaner case
+        return _authController.hasProfile.value
+            ? CleanerDashboard()
+            : CleanerProfilePage();
       default:
         return _authController.hasProfile.value
             ? HomeScreen()
