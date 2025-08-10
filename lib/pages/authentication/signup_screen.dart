@@ -88,7 +88,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      await registerWithEmailAndPassword(email, password);
+
       final response = await http.post(
         Uri.parse('$baseUrl/api/register/'),
         headers: {'Content-Type': 'application/json'},
@@ -100,8 +100,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }),
       );
 
+
       final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
+        await registerWithEmailAndPassword(email, password);
         setState(() => _isOtpVisible = true);
         Navigator.push(
           context,

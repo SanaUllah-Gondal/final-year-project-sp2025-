@@ -2,40 +2,41 @@
 import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
-
 import '../pages/Apis.dart';
 
 class ApiService extends GetxService {
-
-
-  Future<dynamic> get(String endpoint) async {
+  Future<dynamic> get(String endpoint, {Map<String, String>? headers}) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl$endpoint'));
-      return _processResponse(response);
+      final response = await http.get(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: headers,
+      );
+
+      return _handleResponse(response);
     } catch (e) {
-      throw 'Failed to GET data: ${e.toString()}';
+      throw 'Failed to make GET request: $e';
     }
   }
 
-  Future<dynamic> post(String endpoint, dynamic body) async {
+  Future<dynamic> post(String endpoint, dynamic body, {Map<String, String>? headers}) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl$endpoint'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(body),
+        headers: headers?..['Content-Type'] = 'application/json',
+        body: jsonEncode(body),
       );
-      return _processResponse(response);
+
+      return _handleResponse(response);
     } catch (e) {
-      throw 'Failed to POST data: ${e.toString()}';
+      throw 'Failed to make POST request: $e';
     }
   }
 
-  dynamic _processResponse(http.Response response) {
-    final decoded = json.decode(response.body);
+  dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      return decoded;
+      return jsonDecode(response.body);
     } else {
-      throw decoded['message'] ?? 'Request failed with status ${response.statusCode}';
+      throw 'Request failed with status: ${response.statusCode}. ${response.body}';
     }
   }
 }

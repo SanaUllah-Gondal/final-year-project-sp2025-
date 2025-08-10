@@ -1,13 +1,12 @@
-// lib/services/auth_service.dart
+// lib/pages/authentication/auth_service.dart
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:plumber_project/services/api_service.dart';
 import 'package:plumber_project/services/storage_service.dart';
-
 import '../Apis.dart';
 
 class AuthService extends GetxService {
@@ -15,30 +14,80 @@ class AuthService extends GetxService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final StorageService _storageService = Get.find();
 
-  Future<Map<String, dynamic>> loginWithLaravel(
-      String email,
-      String password
-      ) async {
+  Future<Map<String, dynamic>> loginWithLaravel(String email, String password) async {
     try {
-      final response = await _apiService.post(
-        '/api/login',
-        {'email': email, 'password': password},
-      );
+      final url = '$baseUrl/api/login';
+      debugPrint('🔐 Attempting Laravel login to: $url');
+      debugPrint('📧 Email: $email');
+      debugPrint('🔑 Password: ${'*' * password.length} (length: ${password.length})');
 
-      if (response['access_token'] == null) {
-        throw 'Login failed: No access token received';
+      final headers = {'Content-Type': 'application/json'};
+      final body = jsonEncode({'email': email, 'password': password});
+
+      debugPrint('📦 Request body: $body');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: body,
+      ).timeout(const Duration(seconds: 30));
+
+      debugPrint('🔄 Response status: ${response.statusCode}');
+      debugPrint('📄 Response body: ${response.body}');
+
+      // Handle different response scenarios
+      if (response.statusCode == 200) {
+        try {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+          if (data['access_token'] == null) {
+            debugPrint('❌ No access token in response');
+            throw 'Authentication failed: No access token received';
+          }
+
+          debugPrint('✅ Login successful');
+          debugPrint('🔑 Access token: ${data['access_token']?.substring(0, 10)}...');
+          debugPrint('👤 User data: ${data['user']}');
+
+          return data;
+        } catch (e) {
+          debugPrint('❌ JSON parsing error: $e');
+          throw 'Failed to parse server response';
+        }
+      } else if (response.statusCode >= 400 && response.statusCode < 500) {
+        // Handle client errors
+        try {
+          final errorData = jsonDecode(response.body);
+          final errorMessage = errorData['error'] ??
+              errorData['message'] ??
+              'Login failed (${response.statusCode})';
+          debugPrint('❌ Client error: $errorMessage');
+          throw errorMessage;
+        } catch (e) {
+          debugPrint('❌ Error parsing error response: $e');
+          throw 'Login failed with status code: ${response.statusCode}';
+        }
+      } else {
+        // Handle server errors
+        debugPrint('❌ Server error: ${response.statusCode}');
+        throw 'Server error occurred (${response.statusCode})';
       }
-
-      return response;
+    } on TimeoutException {
+      debugPrint('⏱️ Request timed out');
+      throw 'Connection timed out. Please try again.';
+    } on http.ClientException catch (e) {
+      debugPrint('🌐 Network error: $e');
+      throw 'Network error occurred. Please check your connection.';
+    } on FormatException catch (e) {
+      debugPrint('📝 Response format error: $e');
+      throw 'Invalid server response format';
     } catch (e) {
-      throw 'Failed to login with Laravel: ${e.toString()}';
+      debugPrint('❗ Unexpected error: $e');
+      throw 'An unexpected error occurred during login';
     }
   }
 
-  Future<UserCredential> loginWithFirebase(
-      String email,
-      String password
-      ) async {
+  Future<UserCredential> loginWithFirebase(String email, String password) async {
     try {
       return await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
@@ -51,85 +100,51 @@ class AuthService extends GetxService {
     }
   }
 
-  Future<bool> checkUserProfile(
-      String token,
-      int userId,
-      String role,
-      ) async {
+  Future<bool> checkProfileExists() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final profileUrl = '${baseUrl}/api/check-profile/$userId';
+      final token = _storageService.getToken();
+      final userId = _storageService.getUserId();
+      final role = _storageService.getRole();
 
-      if (kDebugMode) {
-        print('Checking profile at: $profileUrl');
+      if (token == null || userId == null || role == null) {
+        return false;
       }
 
-      final profileResponse = await http.get(
-        Uri.parse(profileUrl),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
+      final response = await _apiService.get(
+        '/check-profile-by-email/${_storageService.getEmail()}',
+        headers: {'Authorization': 'Bearer $token'},
       );
 
-      if (kDebugMode) {
-        print('Profile check status: ${profileResponse.statusCode}');
-        print('Profile response: ${profileResponse.body}');
+      // Expect response to contain profile_exists boolean:
+      if (response is Map<String, dynamic> && response['profile_exists'] == true) {
+        await _storageService.setHasProfile(true);
+        return true;
       }
 
-      if (profileResponse.statusCode == 200) {
-        final profileData = jsonDecode(profileResponse.body);
-        final profile = profileData['profile'] ?? {};
-
-        bool hasProfile = false;
-        switch (role.toLowerCase()) {
-          case 'plumber':
-            if (profile['plumber_profile'] != null) {
-              await prefs.setInt('plumber_profile_id', profile['plumber_profile']['id']);
-              hasProfile = true;
-            }
-            break;
-          case 'electrician':
-            if (profile['electrician_profile'] != null) {
-              await prefs.setInt('electrician_profile_id', profile['electrician_profile']['id']);
-              hasProfile = true;
-            }
-            break;
-          case 'cleaner':
-            if (profile['cleaner_profile'] != null) {
-              await prefs.setInt('cleaner_profile_id', profile['cleaner_profile']['id']);
-              hasProfile = true;
-            }
-            break;
-          case 'user':
-            if (profile['user_profile'] != null) {
-              await prefs.setInt('user_profile_id', profile['user_profile']['id']);
-              hasProfile = true;
-            }
-            break;
-        }
-
-        await prefs.setString('profile_data', jsonEncode(profile));
-        return hasProfile;
-      }
+      await _storageService.setHasProfile(false);
       return false;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error checking profile: $e');
-      }
+      debugPrint('Error checking profile: $e');
+      // keep stored value consistent
+      await _storage_service_setFalseSafe();
       return false;
+    }
+  }
+
+  Future<void> _storage_service_setFalseSafe() async {
+    try {
+      await _storageService.setHasProfile(false);
+    } catch (e) {
+      debugPrint('Failed to set has_profile to false: $e');
     }
   }
 
   Future<void> logout() async {
     try {
       await _firebaseAuth.signOut();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
+      await _storageService.clearAll();
     } catch (e) {
-      if (kDebugMode) {
-        print('Error during logout: $e');
-      }
+      debugPrint('Error during logout: $e');
       throw 'Failed to logout: ${e.toString()}';
     }
   }
@@ -151,15 +166,5 @@ class AuthService extends GetxService {
       default:
         return 'Authentication failed: ${e.message}';
     }
-  }
-
-  // Additional cleaner-specific methods
-  Future<bool> checkCleanerProfileExists(String token, int userId) async {
-    return checkUserProfile(token, userId, 'cleaner');
-  }
-
-  Future<void> saveCleanerProfileId(int profileId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('cleaner_profile_id', profileId);
   }
 }

@@ -5,14 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:plumber_project/pages/Apis.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:plumber_project/pages/cleaner/cleaner_dashboard.dart';
-
 import '../authentication/login.dart';
 
 class CleanerProfilePage extends StatefulWidget {
@@ -26,6 +24,7 @@ class CleanerProfilePage extends StatefulWidget {
 
 class _CleanerProfilePageState extends State<CleanerProfilePage> {
   final nameController = TextEditingController();
+  final emailController = TextEditingController();
   final experienceController = TextEditingController();
   final skillsController = TextEditingController();
   final rateController = TextEditingController();
@@ -36,6 +35,7 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
   String? _bearerToken;
   Position? _currentPosition;
   String? _currentAddress;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -46,31 +46,30 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    roleController.text = prefs.getString('role') ?? 'Cleaner';
-    nameController.text = prefs.getString('name') ?? 'Unknown';
+    roleController.text = prefs.getString('role') ?? 'cleaner';
+    nameController.text = prefs.getString('name') ?? '';
+    emailController.text = prefs.getString('email') ?? '';
     _bearerToken = prefs.getString('bearer_token');
   }
+
   Future<void> _navigateToLogin() async {
     try {
-      // Clear any existing data
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
-
-      // Reset all GetX controllers and state
       Get.offAll(
             () => LoginScreen(),
         routeName: '/login',
-        predicate: (route) => false, // Remove all routes
+        predicate: (route) => false,
       );
     } catch (e) {
       debugPrint('Error navigating to login: $e');
     }
   }
+
   Future<void> _getLocationAndAddress() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Location services are disabled')));
+      _showSnackBar('Location services are disabled');
       return;
     }
 
@@ -78,20 +77,17 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Location permission denied')));
+        _showSnackBar('Location permission denied');
         return;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Permission permanently denied. Open settings.'),
-          action: SnackBarAction(
-            label: 'Settings',
-            onPressed: () => openAppSettings(),
-          ),
+      _showSnackBar(
+        'Permission permanently denied. Open settings.',
+        action: SnackBarAction(
+          label: 'Settings',
+          onPressed: () => openAppSettings(),
         ),
       );
       return;
@@ -102,8 +98,6 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      print("Position fetched: ${position.latitude}, ${position.longitude}");
-
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
         position.longitude,
@@ -113,21 +107,26 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
         final place = placemarks.first;
         final address =
             "${place.street}, ${place.locality}, ${place.administrativeArea}, ${place.country}";
-        print("Detected Address: $address");
 
         setState(() {
           _currentPosition = position;
           _currentAddress = address;
         });
       } else {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('No address found')));
+        _showSnackBar('No address found');
       }
     } catch (e) {
-      print("Error fetching location: $e");
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to get location: $e')));
+      _showSnackBar('Failed to get location: $e');
     }
+  }
+
+  void _showSnackBar(String message, {SnackBarAction? action}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: action,
+      ),
+    );
   }
 
   Future<void> _pickImageOption() async {
@@ -152,14 +151,6 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
                 _pickImage(ImageSource.gallery);
               },
             ),
-            ListTile(
-              leading: Icon(Icons.insert_drive_file),
-              title: Text('File'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickFileImage();
-              },
-            ),
           ],
         ),
       ),
@@ -167,77 +158,93 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    final picked = await ImagePicker().pickImage(source: source);
-    if (picked != null) {
-      setState(() {
-        _profileImage = File(picked.path);
-      });
-    }
-  }
-
-  Future<void> _pickFileImage() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
-    if (result != null && result.files.single.path != null) {
-      setState(() {
-        _profileImage = File(result.files.single.path!);
-      });
+    try {
+      final picked = await ImagePicker().pickImage(source: source);
+      if (picked != null) {
+        setState(() {
+          _profileImage = File(picked.path);
+        });
+      }
+    } catch (e) {
+      _showSnackBar('Failed to pick image: $e');
     }
   }
 
   Future<void> _submitProfile() async {
     if (_bearerToken == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Token not found')));
+      _showSnackBar('Authentication required');
       return;
     }
 
-    final url = Uri.parse('$baseUrl/api/profile/');
+    if (nameController.text.isEmpty ||
+        emailController.text.isEmpty ||
+        experienceController.text.isEmpty ||
+        skillsController.text.isEmpty ||
+        rateController.text.isEmpty ||
+        contactController.text.isEmpty) {
+      _showSnackBar('Please fill all required fields');
+      return;
+    }
+
+    if (_profileImage == null) {
+      _showSnackBar('Please upload a profile image');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    final url = Uri.parse('$baseUrl/api/profile/cleaner');
     final request = http.MultipartRequest('POST', url);
     request.headers['Authorization'] = 'Bearer $_bearerToken';
 
     request.fields.addAll({
       'full_name': nameController.text,
+      'email': emailController.text,
       'experience': experienceController.text,
       'skill': skillsController.text,
       'hourly_rate': rateController.text,
       'contact_number': contactController.text,
-      'role': roleController.text,
       if (_currentAddress != null) 'service_area': _currentAddress!,
-      if (_currentPosition != null) ...{
-        'latitude': _currentPosition!.latitude.toString(),
-        'longitude': _currentPosition!.longitude.toString(),
-      },
     });
 
-    if (_profileImage != null) {
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'cleaner_image',
-          _profileImage!.path,
-        ),
-      );
-    }
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'cleaner_image',
+        _profileImage!.path,
+      ),
+    );
 
     try {
       final streamed = await request.send();
       final response = await http.Response.fromStream(streamed);
+      final responseData = json.decode(response.body);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Profile saved successfully')));
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => CleanerDashboard()),
-        );
+        // Save profile data to shared preferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cleaner_profile', json.encode(responseData));
+
+        _showSnackBar('Profile saved successfully');
+        if (widget.onSuccess != null) {
+          widget.onSuccess!();
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => CleanerDashboard()),
+          );
+        }
       } else {
-        print(response.body);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to save profile')));
+        final error = responseData['message'] ?? 'Failed to save profile';
+        _showSnackBar(error);
       }
     } catch (e) {
-      print("Error: $e");
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error saving profile')));
+      _showSnackBar('Error saving profile: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -247,13 +254,20 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
         TextInputType type = TextInputType.text,
         bool readOnly = false,
         List<TextInputFormatter>? formatters,
+        bool isRequired = false,
       }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
+          Row(
+            children: [
+              Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
+              if (isRequired)
+                Text(' *', style: TextStyle(color: Colors.red)),
+            ],
+          ),
           SizedBox(height: 6),
           TextField(
             controller: controller,
@@ -270,103 +284,145 @@ class _CleanerProfilePageState extends State<CleanerProfilePage> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-        onWillPop: () async {
-          await _navigateToLogin();
-          return false; // Prevent default back button behavior
-        },
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(
-              'Cleaner Profile Setup',
-              style: TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.teal,
-            iconTheme: IconThemeData(color: Colors.white),
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back),
-              onPressed: _navigateToLogin,
-            ),
+      onWillPop: () async {
+        await _navigateToLogin();
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            'Cleaner Profile Setup',
+            style: TextStyle(color: Colors.white),
           ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
+          backgroundColor: Colors.teal,
+          iconTheme: IconThemeData(color: Colors.white),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: _navigateToLogin,
+          ),
+        ),
+        body: Stack(
           children: [
-            Center(
+            SingleChildScrollView(
+              padding: EdgeInsets.all(16),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundImage: _profileImage != null
-                        ? FileImage(_profileImage!)
-                        : null,
-                    backgroundColor: Colors.teal[200],
-                    child: _profileImage == null
-                        ? Icon(Icons.cleaning_services, size: 50, color: Colors.white)
-                        : null,
+                  Center(
+                    child: Column(
+                      children: [
+                        Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 50,
+                              backgroundImage: _profileImage != null
+                                  ? FileImage(_profileImage!)
+                                  : null,
+                              backgroundColor: Colors.teal[200],
+                              child: _profileImage == null
+                                  ? Icon(Icons.cleaning_services,
+                                  size: 50,
+                                  color: Colors.white)
+                                  : null,
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.teal,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: IconButton(
+                                  icon: Icon(Icons.camera_alt,
+                                      color: Colors.white,
+                                      size: 20),
+                                  onPressed: _pickImageOption,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'Profile Photo',
+                          style: TextStyle(color: Colors.teal),
+                        ),
+                      ],
+                    ),
                   ),
-                  SizedBox(height: 10),
-                  TextButton.icon(
-                    onPressed: _pickImageOption,
-                    icon: Icon(Icons.camera_alt, color: Colors.teal),
-                    label: Text("Upload Profile Photo", style: TextStyle(color: Colors.teal)),
+                  SizedBox(height: 20),
+                  _buildField("Full Name", nameController, isRequired: true),
+                  _buildField("Email", emailController,
+                      type: TextInputType.emailAddress,
+                      isRequired: true),
+                  _buildField(
+                    "Experience (Years)",
+                    experienceController,
+                    type: TextInputType.number,
+                    isRequired: true,
+                  ),
+                  _buildField("Cleaning Skills", skillsController,
+                      isRequired: true),
+                  _buildField(
+                    "Hourly Rate (PKR)",
+                    rateController,
+                    type: TextInputType.number,
+                    isRequired: true,
+                  ),
+                  _buildField(
+                    "Contact Number",
+                    contactController,
+                    type: TextInputType.phone,
+                    formatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(11),
+                    ],
+                    isRequired: true,
+                  ),
+                  _buildField("Role", roleController, readOnly: true),
+                  if (_currentAddress != null)
+                    _buildField(
+                      "Service Area",
+                      TextEditingController(text: _currentAddress),
+                      readOnly: true,
+                    ),
+                  SizedBox(height: 30),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _submitProfile,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? CircularProgressIndicator(color: Colors.white)
+                          : Text(
+                        "Save Profile",
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-            SizedBox(height: 20),
-            _buildField("Full Name", nameController),
-            _buildField(
-              "Experience (Years)",
-              experienceController,
-              type: TextInputType.number,
-            ),
-            _buildField("Cleaning Skills", skillsController),
-            _buildField(
-              "Hourly Rate (PKR)",
-              rateController,
-              type: TextInputType.number,
-            ),
-            _buildField(
-              "Contact Number",
-              contactController,
-              type: TextInputType.phone,
-              formatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(11),
-              ],
-            ),
-            _buildField("Role", roleController, readOnly: true),
-            if (_currentAddress != null)
-              _buildField(
-                "Service Area",
-                TextEditingController(text: _currentAddress),
-                readOnly: true,
-              ),
-            SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _submitProfile,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  "Save Profile",
-                  style: TextStyle(fontSize: 16),
+            if (_isLoading)
+              Container(
+                color: Colors.black.withOpacity(0.5),
+                child: Center(
+                  child: CircularProgressIndicator(),
                 ),
               ),
-            ),
           ],
         ),
       ),
-    )
     );
   }
 }

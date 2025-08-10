@@ -10,6 +10,7 @@ import 'package:plumber_project/pages/plumber/plumber_dashboard.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:http_parser/http_parser.dart';
 
 class PlumberProfilePage extends StatefulWidget {
   final VoidCallback? onSuccess;
@@ -22,6 +23,7 @@ class PlumberProfilePage extends StatefulWidget {
 
 class _PlumberProfilePageState extends State<PlumberProfilePage> {
   final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
   final TextEditingController experienceController = TextEditingController();
   final TextEditingController skillsController = TextEditingController();
   final TextEditingController areaController = TextEditingController();
@@ -59,12 +61,14 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
 
   Future<void> _loadLocalData() async {
     final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('email') ?? 'Unknown';
     final name= prefs.getString('name') ?? 'Unknown';
     final role = prefs.getString('role') ?? 'Unknown';
     final token = prefs.getString('bearer_token');
     setState(() {
       roleController.text = role;
       nameController.text=name;
+      emailController.text=email;
       _bearerToken = token;
     });
   }
@@ -195,7 +199,23 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
       return;
     }
 
-    final url = Uri.parse('$baseUrl/api/profile/');
+    // Validate required fields
+    if (nameController.text.isEmpty ||
+        emailController.text.isEmpty ||
+        experienceController.text.isEmpty ||
+        skillsController.text.isEmpty ||
+        areaController.text.isEmpty ||
+        rateController.text.isEmpty ||
+        contactController.text.isEmpty ||
+        _profileImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please fill all required fields and upload an image')),
+      );
+      return;
+    }
+
+    // CORRECTED ENDPOINT - changed from '/api/profile/plumber' to '/profiles/plumber'
+    final url = Uri.parse('$baseUrl/profiles/plumber');
     final request = http.MultipartRequest('POST', url);
 
     request.headers.addAll({
@@ -203,7 +223,9 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
       'Accept': 'application/json',
     });
 
+    // Add text fields
     request.fields['full_name'] = nameController.text;
+    request.fields['email'] = emailController.text;
     request.fields['experience'] = experienceController.text;
     request.fields['skill'] = skillsController.text;
     request.fields['service_area'] = areaController.text;
@@ -211,38 +233,47 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
     request.fields['contact_number'] = contactController.text;
     request.fields['role'] = roleController.text;
 
+    // Add location if available
     if (_latitude != null && _longitude != null) {
       request.fields['latitude'] = _latitude.toString();
       request.fields['longitude'] = _longitude.toString();
     }
 
-    if (_profileImage != null) {
-      request.files.add(
-        await http.MultipartFile.fromPath('plumber_image', _profileImage!.path),
-      );
-    }
-
+    // Add image file
     try {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'plumber_image',
+          _profileImage!.path,
+        ),
+      );
+
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = json.decode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Profile saved successfully')));
-        Navigator.push(
+          SnackBar(content: Text(responseData['message'] ?? 'Profile saved successfully')),
+        );
+        if (widget.onSuccess != null) {
+          widget.onSuccess!();
+        }
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => PlumberDashboard()),
         );
       } else {
-        print('Failed: ${response.statusCode}');
-        print('Body: ${response.body}');
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to save profile')));
+        final errorData = json.decode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorData['message'] ?? 'Failed to save profile. Status code: ${response.statusCode}')),
+        );
       }
     } catch (e) {
       print('Error: $e');
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error saving profile')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving profile: ${e.toString()}')),
+      );
     }
   }
 
@@ -250,6 +281,7 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
   void dispose() {
     areaFocusNode.dispose();
     nameController.dispose();
+    emailController.dispose();
     experienceController.dispose();
     skillsController.dispose();
     areaController.dispose();
@@ -305,9 +337,11 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
               SizedBox(height: 20),
               _buildLabeledTextField("Experience (Years)", experienceController,
                   type: TextInputType.number),
+              _buildLabeledTextField("Email", emailController),
               _buildLabeledTextField("Skills", skillsController),
-              _buildLabeledTextField("Service Area", areaController,
-                  readOnly: true),
+              _buildLabeledTextFieldLocation("Service Area", areaController,
+                  readOnly: true,
+                onTap: _getLiveLocation),
               _buildLabeledTextField("Hourly Rate (PKR)", rateController,
                   type: TextInputType.number),
               _buildLabeledTextField("Contact Number", contactController,
@@ -372,5 +406,44 @@ class _PlumberProfilePageState extends State<PlumberProfilePage> {
       ),
     );
   }
+  Widget _buildLabeledTextFieldLocation(
+      String label,
+      TextEditingController controller, {
+        TextInputType type = TextInputType.text,
+        List<TextInputFormatter>? inputFormatters,
+        bool readOnly = false,
+        VoidCallback? onTap, // 👈 new parameter
+      }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.white)),
+          SizedBox(height: 8),
+          TextField(
+            controller: controller,
+            keyboardType: type,
+            inputFormatters: inputFormatters,
+            readOnly: readOnly,
+            onTap: onTap, // 👈 triggers location update
+            style: TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.1),
+              border: OutlineInputBorder(),
+              hintText: 'Enter $label',
+              hintStyle: TextStyle(color: Colors.white70),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
 

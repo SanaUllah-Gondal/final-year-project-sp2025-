@@ -1258,7 +1258,7 @@ class _ElectricianProfilePageState extends State<ElectricianProfilePage> {
       return;
     }
 
-    final url = Uri.parse('$baseUrl/api/profile/');
+    final url = Uri.parse('$baseUrl/api/profile/electrician');
     final request = http.MultipartRequest('POST', url);
     request.headers['Authorization'] = 'Bearer $_bearerToken';
 

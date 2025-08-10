@@ -1121,7 +1121,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       return;
     }
 
-    var uri = Uri.parse("$baseUrl/api/profile/");
+    var uri = Uri.parse("$baseUrl/api/profile/user");
     var request = http.MultipartRequest("POST", uri);
     request.headers['Authorization'] = 'Bearer $_bearerToken';
 

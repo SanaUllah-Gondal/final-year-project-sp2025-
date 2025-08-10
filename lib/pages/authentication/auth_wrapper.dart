@@ -1,44 +1,17 @@
+// lib/pages/authentication/auth_wrapper.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:plumber_project/controllers/auth_controller.dart';
 import 'package:plumber_project/pages/authentication/login.dart';
-import '../electrition/electrition_profile.dart';
-import '../electrition/electrition_dashboard.dart';
-import '../plumber/plumber_dashboard.dart';
-import '../plumber/plumber_profile.dart';
-import '../cleaner/cleaner_dashboard.dart'; // Add this import
-import '../cleaner/cleaner_profile.dart'; // Add this import
-import '../users/dashboard.dart';
-import '../users/profile.dart';
 
-class AuthWrapper extends StatefulWidget {
-  @override
-  State<AuthWrapper> createState() => _AuthWrapperState();
-}
-
-class _AuthWrapperState extends State<AuthWrapper> {
+class AuthWrapper extends StatelessWidget {
   final AuthController _authController = Get.find();
 
-  @override
-  void initState() {
-    super.initState();
-    _loadHasProfileFromPrefs();
-  }
-
-  Future<void> _loadHasProfileFromPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hasProfile = prefs.getBool('hasProfile') ?? false;
-    _authController.hasProfile.value = hasProfile;
-  }
+  AuthWrapper({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      print('isLoggedIn: ${_authController.isLoggedIn.value}');
-      print('role: ${_authController.role.value}');
-      print('hasProfile: ${_authController.hasProfile.value}');
-
       if (_authController.isLoading.value) {
         return const Scaffold(
           body: Center(child: CircularProgressIndicator()),
@@ -46,31 +19,19 @@ class _AuthWrapperState extends State<AuthWrapper> {
       }
 
       if (!_authController.isLoggedIn.value) {
-        return const LoginScreen();
+        return  LoginScreen();
       }
 
-      return _buildRoleBasedScreen();
-    });
-  }
+      // If logged in, trigger navigation to appropriate screen,
+      // then show a spinner while navigation is performed.
+      // We use a microtask to avoid triggering navigation during build.
+      Future.microtask(() {
+        _authController.navigateBasedOnRole();
+      });
 
-  Widget _buildRoleBasedScreen() {
-    switch (_authController.role.value.toLowerCase()) { // Make case-insensitive
-      case 'plumber':
-        return _authController.hasProfile.value
-            ? PlumberDashboard()
-            : PlumberProfilePage();
-      case 'electrician':
-        return _authController.hasProfile.value
-            ? ElectricianDashboard()
-            : ElectricianProfilePage();
-      case 'cleaner': // Add cleaner case
-        return _authController.hasProfile.value
-            ? CleanerDashboard()
-            : CleanerProfilePage();
-      default:
-        return _authController.hasProfile.value
-            ? HomeScreen()
-            : ProfileScreen();
-    }
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    });
   }
 }
