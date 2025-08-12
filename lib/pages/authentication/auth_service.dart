@@ -14,6 +14,24 @@ class AuthService extends GetxService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final StorageService _storageService = Get.find();
 
+
+  Future<dynamic> getRequest(String url, {Map<String, String>? headers}) async {
+    try {
+      final response = await http.get(
+        Uri.parse(url),
+        headers: headers, // can be null
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed request: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> loginWithLaravel(String email, String password) async {
     try {
       final url = '$baseUrl/api/login';

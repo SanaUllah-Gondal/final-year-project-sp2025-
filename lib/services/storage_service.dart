@@ -1,64 +1,80 @@
-// lib/services/storage_service.dart
-import 'package:flutter/foundation.dart';
-import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class StorageService extends GetxService {
-  late SharedPreferences _prefs;
+class StorageService {
+  // Keys
+  static const String _kToken = 'bearer_token';
+  static const String _kRole = 'role';
+  static const String _kUserId = 'user_id';
+  static const String _kEmail = 'email';
+  static const String _kName = 'name';
+  static const String _kHasProfile = 'has_profile';
+  static const String _kRememberMe = 'remember_me';
+  static const String _kSavedEmail = 'saved_email';
 
-  // Call this during app startup via Get.putAsync(() => StorageService().init());
+  SharedPreferences? _prefs;
+
+  /// Initialize the service before usage
   Future<StorageService> init() async {
     _prefs = await SharedPreferences.getInstance();
-    debugPrint('💾 StorageService initialized');
     return this;
   }
 
+  /// Helper to get initialized prefs safely
+  SharedPreferences get _preferences {
+    if (_prefs == null) {
+      throw Exception("StorageService not initialized. Call init() first.");
+    }
+    return _prefs!;
+  }
+
+  /// Save user data after successful login
   Future<void> saveUserData({
     required String token,
     required String role,
     required int userId,
-    required String email,
     required String name,
-
+    required String email,
   }) async {
-    try {
-      // Validate role
-      final validRoles = ['plumber', 'electrician', 'cleaner', 'user'];
-      final normalizedRole = role.toLowerCase();
-
-      if (!validRoles.contains(normalizedRole)) {
-        throw 'Invalid role: $role';
-      }
-
-      await Future.wait([
-        _prefs.setString('bearer_token', token),
-        _prefs.setString('role', normalizedRole),
-        _prefs.setInt('user_id', userId),
-        _prefs.setString('email', email),
-        _prefs.setString('name', name),
-
-      ]);
-      debugPrint('💾 Saved user data for role: $normalizedRole');
-    } catch (e) {
-      debugPrint('❌ Error saving user data: $e');
-      rethrow;
-    }
+    await _preferences.setString(_kToken, token);
+    await _preferences.setString(_kRole, role);
+    await _preferences.setInt(_kUserId, userId);
+    await _preferences.setString(_kName, name);
+    await _preferences.setString(_kEmail, email);
   }
 
-  String? getToken() => _prefs.getString('bearer_token');
-  String? getRole() => _prefs.getString('role');
-  int? getUserId() => _prefs.getInt('user_id');
-  String? getEmail() => _prefs.getString('email');
-  String? getName() => _prefs.getString('name');
-  bool? getHasProfile() => _prefs.getBool('has_profile');
+  /// Getters for stored values
+  String? getToken() => _preferences.getString(_kToken);
+  String? getRole() => _preferences.getString(_kRole);
+  int? getUserId() => _preferences.getInt(_kUserId);
+  String? getEmail() => _preferences.getString(_kEmail);
+  String? getName() => _preferences.getString(_kName);
 
+  /// Profile existence flag
   Future<void> setHasProfile(bool value) async {
-    await _prefs.setBool('has_profile', value);
-    debugPrint('💾 set has_profile = $value');
+    await _preferences.setBool(_kHasProfile, value);
   }
 
+  bool getHasProfile() => _preferences.getBool(_kHasProfile) ?? false;
+
+  /// Save "Remember Me" credentials
+  Future<void> saveCredentials(String email) async {
+    await _preferences.setBool(_kRememberMe, true);
+    await _preferences.setString(_kSavedEmail, email);
+  }
+
+  bool getRememberMe() => _preferences.getBool(_kRememberMe) ?? false;
+  String? getSavedEmail() => _preferences.getString(_kSavedEmail);
+
+  /// Clear all stored data, keeping credentials if Remember Me is enabled
   Future<void> clearAll() async {
-    await _prefs.clear();
-    debugPrint('🧹 Cleared all storage data');
+    bool remember = getRememberMe();
+    String? savedEmail = getSavedEmail();
+
+    await _preferences.clear();
+
+    if (remember && savedEmail != null) {
+      await _preferences.setBool(_kRememberMe, true);
+      await _preferences.setString(_kSavedEmail, savedEmail);
+    }
   }
 }
