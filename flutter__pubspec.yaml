@@ -1,0 +1,14 @@
+name: skilllink
+description: SkillLink sample app (stub)
+version: 1.0.0+1
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.1
+  cupertino_icons: ^1.0.6
+
+flutter:
+  uses-material-design: true
