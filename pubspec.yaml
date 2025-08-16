@@ -54,6 +54,7 @@ dependencies:
   provider: ^6.1.5
   get: ^4.7.2
   email_validator: ^3.0.0
+  dio: ^5.9.0
   
 
 dev_dependencies:

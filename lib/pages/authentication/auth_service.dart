@@ -1,12 +1,14 @@
 // lib/pages/authentication/auth_service.dart
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:plumber_project/services/api_service.dart';
 import 'package:plumber_project/services/storage_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../Apis.dart';
 
 class AuthService extends GetxService {
@@ -127,14 +129,16 @@ class AuthService extends GetxService {
       if (token == null || userId == null || role == null) {
         return false;
       }
+      final prefs= await SharedPreferences.getInstance();
+      final profileId= prefs.getString('user_id') ?? '';
 
-      final response = await _apiService.get(
-        '/check-profile-by-email/${_storageService.getEmail()}',
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      final response = await _authenticatedRequest(
+        '$baseUrl/profiles/plumber/$profileId',
+      ).timeout(const Duration(seconds: 10));
+
 
       // Expect response to contain profile_exists boolean:
-      if (response is Map<String, dynamic> && response['profile_exists'] == true) {
+      if (response ==200) {
         await _storageService.setHasProfile(true);
         return true;
       }
@@ -146,6 +150,56 @@ class AuthService extends GetxService {
       // keep stored value consistent
       await _storage_service_setFalseSafe();
       return false;
+    }
+  }
+  Future<http.Response> _authenticatedRequest(
+      String url, {
+        String method = 'GET',
+        Map<String, dynamic>? body,
+        List<http.MultipartFile>? files,
+      }) async {
+    try {
+      final prefs= await SharedPreferences.getInstance();
+      final bearerToken = prefs.getString('bearer_token') ?? '';
+      final headers = {
+        'Authorization': 'Bearer ${bearerToken}',
+        'Accept': 'application/json',
+      };
+
+      if (files != null || method == 'POST' || method == 'PUT') {
+        // Always use multipart for create/update requests
+        final request = http.MultipartRequest(method, Uri.parse(url));
+        request.headers.addAll(headers);
+
+        // Add text fields
+        if (body != null) {
+          body.forEach((key, value) {
+            if (value != null) {
+              request.fields[key] = value.toString();
+            }
+          });
+        }
+
+        // Add files
+        if (files != null) {
+          request.files.addAll(files);
+        }
+
+        final streamed = await request.send();
+        return await http.Response.fromStream(streamed);
+      } else {
+        // For GET requests
+        return await http.get(
+          Uri.parse(url),
+          headers: headers,
+        );
+      }
+    } on SocketException {
+      throw Exception("No internet connection");
+    } on TimeoutException {
+      throw Exception("Request timed out");
+    } catch (e) {
+      throw Exception("Request failed: ${e.toString()}");
     }
   }
 
