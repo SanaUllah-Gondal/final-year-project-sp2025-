@@ -1,1 +1,3 @@
-// Sample content for database/seeders/UserSeeder.php
+<?php
+
+// Userseeder.Php
