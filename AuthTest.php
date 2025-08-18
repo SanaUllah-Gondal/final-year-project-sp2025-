@@ -1,0 +1,3 @@
+<?php
+
+// Authtest.Php

@@ -1,0 +1,3 @@
+<?php
+
+// Welcome.Blade.Php
