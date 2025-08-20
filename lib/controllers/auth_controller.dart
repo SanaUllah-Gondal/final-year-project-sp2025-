@@ -25,6 +25,7 @@ class AuthController extends GetxController {
     super.onInit();
     _checkLoginStatus();
   }
+
   Future<dynamic> getRequest(String url, {Map<String, String>? headers}) async {
     try {
       final response = await http.get(
@@ -55,6 +56,7 @@ class AuthController extends GetxController {
       throw Exception('Error: $e');
     }
   }
+
   Future<void> refreshToken() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -85,89 +87,100 @@ class AuthController extends GetxController {
     debugPrint('[AuthController] Checking login status...');
     try {
       isLoading.value = true;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('bearer_token') ?? '';
+      final storedRole = prefs.getString('role')?.toLowerCase() ?? '';
+      final storedHasProfile = prefs.getBool('hasProfile') ?? false;
+      final storedEmail = prefs.getString('email') ?? '';
+
+      debugPrint('[AuthController] Stored token: ${token.isNotEmpty ? "exists" : "missing"}');
+      debugPrint('[AuthController] Stored role: $storedRole');
+      debugPrint('[AuthController] Stored hasProfile: $storedHasProfile');
+      debugPrint('[AuthController] Stored email: $storedEmail');
+
+      // Check if we have valid stored credentials
+      if (token.isNotEmpty && storedRole.isNotEmpty && storedEmail.isNotEmpty) {
+        debugPrint('[AuthController] Found stored credentials, restoring state...');
+
+        // Restore state from SharedPreferences
+        isLoggedIn.value = true;
+        role.value = storedRole;
+        hasProfile.value = storedHasProfile;
+
+        // Verify Firebase auth state matches
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser == null) {
+          debugPrint('[AuthController] Firebase user missing but token exists, attempting to restore Firebase session...');
+          try {
+            // Try to sign in with stored email (this is a simplified approach)
+            // In production, you'd need to store password securely or use token-based auth
+            debugPrint('[AuthController] Cannot automatically restore Firebase session. User needs to login again.');
+            await _clearStoredData(prefs);
+            return;
+          } catch (e) {
+            debugPrint('[AuthController] Error restoring Firebase session: $e');
+            await _clearStoredData(prefs);
+            return;
+          }
+        } else {
+          debugPrint('[AuthController] Firebase user found, session is valid');
+          navigateBasedOnRole();
+          return;
+        }
+      }
+
+      // If no stored credentials, check Firebase auth state
       final currentUser = FirebaseAuth.instance.currentUser;
-      isLoggedIn.value = currentUser != null;
-
-      if (isLoggedIn.value) {
-        debugPrint('[AuthController] Firebase user found, checking profile...');
-
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('bearer_token') ?? '';
+      if (currentUser != null) {
+        debugPrint('[AuthController] Firebase user found but no stored credentials, checking profile...');
 
         if (token.isEmpty) {
-          debugPrint('[AuthController] No token found');
-          isLoggedIn.value = false;
+          debugPrint('[AuthController] No token found with Firebase user');
+          // User is logged into Firebase but not Laravel - need to re-login
+          await FirebaseAuth.instance.signOut();
+          await _clearStoredData(prefs);
           return;
         }
 
         try {
-          // First try the unified endpoint
-          final response = await http.get(
-            Uri.parse('$baseUrl/api/check-profile'),
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Accept': 'application/json',
-            },
-          ).timeout(const Duration(seconds: 10));
-
-          debugPrint('[AuthController] Profile check response: ${response.statusCode} ${response.body}');
-
-          if (response.statusCode == 200) {
-            final data = json.decode(response.body);
-            if (data['success'] == true) {
-              final profileData = data['data'];
-
-              // Handle type conversion safely
-              hasProfile.value = profileData['exists'] ?? false;
-              role.value = (profileData['role']?.toString().toLowerCase() ?? '');
-
-              // Save to shared preferences
-              await prefs.setBool('hasProfile', hasProfile.value);
-              await prefs.setString('role', role.value);
-
-              debugPrint('[AuthController] Profile exists: ${hasProfile.value}, Role: ${role.value}');
-            } else {
-              throw Exception(data['message'] ?? 'Profile check failed');
-            }
-          } else if (response.statusCode == 404) {
-            // Fallback to role-specific endpoints if unified endpoint not found
-            await _checkProfileUsingRoleSpecificEndpoints(token, prefs);
-          } else {
-            throw Exception('HTTP ${response.statusCode}: ${response.body}');
-          }
+          // Check profile status
+          await _checkProfileStatus(token, prefs);
+          navigateBasedOnRole();
         } catch (e) {
           debugPrint('[AuthController] Error checking profile: $e');
-          hasProfile.value = false;
-          role.value = '';
-          await prefs.setBool('hasProfile', false);
-          await prefs.setString('role', '');
+          await _clearStoredData(prefs);
         }
-
-        navigateBasedOnRole();
       } else {
-        debugPrint('[AuthController] No Firebase user found');
-        hasProfile.value = false;
-        role.value = '';
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('hasProfile', false);
-        await prefs.setString('role', '');
+        debugPrint('[AuthController] No active session found');
+        await _clearStoredData(prefs);
       }
     } catch (e) {
       debugPrint('[AuthController] Error checking login status: $e');
-      hasProfile.value = false;
-      role.value = '';
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('hasProfile', false);
-      await prefs.setString('role', '');
+      await _clearStoredData(await SharedPreferences.getInstance());
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> _checkProfileUsingRoleSpecificEndpoints(String token, SharedPreferences prefs) async {
+  Future<void> _clearStoredData(SharedPreferences prefs) async {
+    isLoggedIn.value = false;
+    role.value = '';
+    hasProfile.value = false;
+    await prefs.setBool('hasProfile', false);
+    await prefs.setString('role', '');
+    await prefs.setString('bearer_token', '');
+    await prefs.setString('email', '');
+    await prefs.setString('user_id', '');
+    await prefs.setString('name', '');
+    debugPrint('[AuthController] Cleared all stored data');
+  }
+
+  Future<void> _checkProfileStatus(String token, SharedPreferences prefs) async {
     try {
-      // Get the user's role from token or previous storage
       final storedRole = prefs.getString('role')?.toLowerCase();
+      debugPrint('[AuthController] Checking profile for role: $storedRole');
+
       if (storedRole == null || storedRole.isEmpty) {
         throw Exception('No role available for profile check');
       }
@@ -181,7 +194,7 @@ class AuthController extends GetxController {
           endpoint = '$baseUrl/api/profiles/check-electrician';
           break;
         case 'cleaner':
-          endpoint = '$baseUrl/api/profiles/check-cleaner';
+          endpoint = '$baseUrl/api/cleaner/profile/check';
           break;
         default:
           throw Exception('Unsupported role: $storedRole');
@@ -195,17 +208,28 @@ class AuthController extends GetxController {
         },
       ).timeout(const Duration(seconds: 10));
 
+      debugPrint('[AuthController] Profile check response: ${response.statusCode} ${response.body}');
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
-          hasProfile.value = true ?? false;
+          final profileData = data['data'] ?? data;
+
+          hasProfile.value = profileData['exists'] ?? false;
           role.value = storedRole;
+
           await prefs.setBool('hasProfile', hasProfile.value);
           await prefs.setString('role', role.value);
+
+          debugPrint('[AuthController] Profile exists: ${hasProfile.value}, Role: ${role.value}');
+        } else {
+          throw Exception(data['message'] ?? 'Profile check failed');
         }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      debugPrint('[AuthController] Error in role-specific profile check: $e');
+      debugPrint('[AuthController] Error checking profile status: $e');
       rethrow;
     }
   }
@@ -222,8 +246,18 @@ class AuthController extends GetxController {
       final laravelResponse = await _authService.loginWithLaravel(email, password);
       debugPrint('[AuthController] Laravel response: $laravelResponse');
 
-      final userRole = laravelResponse['user']['role']?.toString().toLowerCase() ?? '';
-      if (userRole.isEmpty) throw 'Missing role from Laravel response';
+      // Extract user data safely
+      final userData = laravelResponse['user'];
+      if (userData == null || userData is! Map<String, dynamic>) {
+        throw 'Invalid user data in Laravel response';
+      }
+
+      final userRole = userData['role']?.toString().toLowerCase() ?? '';
+      debugPrint('[AuthController] User role: $userRole');
+
+      if (userRole.isEmpty) {
+        throw 'Missing role from Laravel response';
+      }
 
       // 2) Firebase login
       await _authService.loginWithFirebase(email, password);
@@ -233,13 +267,13 @@ class AuthController extends GetxController {
       await _storageService.saveUserData(
         token: laravelResponse['access_token'],
         role: userRole,
-        userId: laravelResponse['user']['id'],
-        name: laravelResponse['user']['name'],
-        email: laravelResponse['user']['email'],
+        userId: userData['id'],
+        name: userData['name'],
+        email: userData['email'],
       );
 
       // 4) Check profile existence (backend)
-      final profileExists = await _authService.checkProfileExists();
+      final profileExists = await _checkProfileAfterLogin(laravelResponse['access_token'], userRole);
 
       hasProfile.value = profileExists;
 
@@ -255,6 +289,42 @@ class AuthController extends GetxController {
       rethrow;
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<bool> _checkProfileAfterLogin(String token, String userRole) async {
+    try {
+      String endpoint;
+      switch (userRole) {
+        case 'plumber':
+          endpoint = '$baseUrl/api/profiles/check-plumber';
+          break;
+        case 'electrician':
+          endpoint = '$baseUrl/api/profiles/check-electrician';
+          break;
+        case 'cleaner':
+          endpoint = '$baseUrl/api/cleaner/profile/check';
+          break;
+        default:
+          return false;
+      }
+
+      final response = await http.get(
+        Uri.parse(endpoint),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true && (data['data']?['exists'] ?? data['exists'] ?? false);
+      }
+      return false;
+    } catch (e) {
+      debugPrint('[AuthController] Error checking profile after login: $e');
+      return false;
     }
   }
 
@@ -296,6 +366,11 @@ class AuthController extends GetxController {
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('hasProfile', false);
+      await prefs.setString('role', '');
+      await prefs.setString('bearer_token', '');
+      await prefs.setString('email', '');
+      await prefs.setString('user_id', '');
+      await prefs.setString('name', '');
 
       Get.offAllNamed(AppRoutes.LOGIN);
     } catch (e) {

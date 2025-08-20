@@ -126,6 +126,7 @@ class AuthService extends GetxService {
       final userId = _storageService.getUserId();
       final role = _storageService.getRole();
 
+
       if (token == null || userId == null || role == null) {
         return false;
       }

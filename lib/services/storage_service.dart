@@ -53,6 +53,9 @@ class StorageService {
   Future<void> setHasProfile(bool value) async {
     await _preferences.setBool(_kHasProfile, value);
   }
+  Future<void> setRole(String role) async {
+    await _preferences.setString(_kRole, role);
+  }
 
   bool getHasProfile() => _preferences.getBool(_kHasProfile) ?? false;
 
