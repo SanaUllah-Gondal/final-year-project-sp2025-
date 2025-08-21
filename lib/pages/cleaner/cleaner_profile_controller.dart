@@ -13,6 +13,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 import 'package:email_validator/email_validator.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../routes/app_pages.dart';
 import '../Apis.dart';
 
@@ -352,6 +353,9 @@ class CleanerProfileController extends GetxController {
         successMessage.value = responseData['message'] ??
             (isUpdate ? 'Profile updated successfully' : 'Profile created successfully');
         Get.toNamed(AppRoutes.CLEANER_DASHBOARD);
+        final authController = Get.find<AuthController>();
+        authController.hasProfile.value = true;
+
         if (!isUpdate && responseData['location_token'] != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('location_token', responseData['location_token']);

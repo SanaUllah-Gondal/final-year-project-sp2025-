@@ -180,7 +180,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         destination = ElectricianProfilePage();
         break;
       case 'cleaner':
-        destination = CleanerProfilePage(); // Make sure this exists
+        destination = CleanerProfilePage();
         break;
       case 'user':
       default:

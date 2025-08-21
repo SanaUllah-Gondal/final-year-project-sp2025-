@@ -1,4 +1,3 @@
-// lib/controllers/auth_controller.dart
 import 'dart:async';
 import 'dart:convert';
 import 'package:get/get.dart';
@@ -19,11 +18,113 @@ class AuthController extends GetxController {
   final RxBool isLoggedIn = false.obs;
   final RxString role = ''.obs;
   final RxBool hasProfile = false.obs;
+  final RxBool _initialCheckComplete = false.obs;
 
   @override
   void onInit() {
     super.onInit();
-    _checkLoginStatus();
+    // Don't check login status here - let main() handle initial route
+    // We'll complete initialization after app starts
+  }
+
+  // Call this method after app starts to complete initialization
+  Future<void> completeInitialization() async {
+    if (_initialCheckComplete.value) return;
+
+    debugPrint('[AuthController] Completing initialization...');
+    await _verifyAndSyncSession();
+    _initialCheckComplete.value = true;
+  }
+
+  Future<void> _verifyAndSyncSession() async {
+    debugPrint('[AuthController] Verifying and syncing session...');
+    try {
+      isLoading.value = true;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('bearer_token') ?? '';
+      final storedRole = prefs.getString('role')?.toLowerCase() ?? '';
+      final storedHasProfile = prefs.getBool('hasProfile') ?? false;
+      final storedEmail = prefs.getString('email') ?? '';
+
+      debugPrint('[AuthController] Stored token: ${token.isNotEmpty ? "exists" : "missing"}');
+      debugPrint('[AuthController] Stored role: $storedRole');
+      debugPrint('[AuthController] Stored hasProfile: $storedHasProfile');
+      debugPrint('[AuthController] Stored email: $storedEmail');
+
+      // If we have valid stored credentials, restore state
+      if (token.isNotEmpty && storedRole.isNotEmpty && storedEmail.isNotEmpty) {
+        debugPrint('[AuthController] Found stored credentials, restoring state...');
+
+        isLoggedIn.value = true;
+        role.value = storedRole;
+        hasProfile.value = storedHasProfile;
+
+        // Verify Firebase auth state matches
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser == null || currentUser.email != storedEmail) {
+          debugPrint('[AuthController] Firebase session mismatch, signing out...');
+          await FirebaseAuth.instance.signOut();
+          await _clearStoredData(prefs);
+          return;
+        }
+
+        debugPrint('[AuthController] Session is valid, user is logged in');
+
+        // If we have a profile, make sure we're on the right screen
+        if (storedHasProfile && Get.currentRoute != _getDashboardRoute(storedRole)) {
+          Get.offAllNamed(_getDashboardRoute(storedRole));
+        } else if (!storedHasProfile && !Get.currentRoute.endsWith('profile')) {
+          Get.offAllNamed(_getProfileRoute(storedRole));
+        }
+
+        return;
+      }
+
+      // If no stored credentials but Firebase user exists, clear both
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        debugPrint('[AuthController] Firebase user found but no stored credentials, cleaning up...');
+        await FirebaseAuth.instance.signOut();
+        await _clearStoredData(prefs);
+        return;
+      }
+
+      debugPrint('[AuthController] No active session found');
+      await _clearStoredData(prefs);
+
+    } catch (e) {
+      debugPrint('[AuthController] Error verifying session: $e');
+      await _clearStoredData(await SharedPreferences.getInstance());
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  String _getDashboardRoute(String role) {
+    switch (role) {
+      case 'plumber':
+        return AppRoutes.PLUMBER_DASHBOARD;
+      case 'electrician':
+        return AppRoutes.ELECTRICIAN_DASHBOARD;
+      case 'cleaner':
+        return AppRoutes.CLEANER_DASHBOARD;
+      default:
+        return AppRoutes.HOME;
+    }
+  }
+
+  String _getProfileRoute(String role) {
+    switch (role) {
+      case 'plumber':
+        return AppRoutes.PLUMBER_PROFILE;
+      case 'electrician':
+        return AppRoutes.ELECTRICIAN_PROFILE;
+      case 'cleaner':
+        return AppRoutes.CLEANER_PROFILE;
+      default:
+        return AppRoutes.USER_PROFILE;
+    }
   }
 
   Future<dynamic> getRequest(String url, {Map<String, String>? headers}) async {
@@ -63,7 +164,7 @@ class AuthController extends GetxController {
       final currentToken = prefs.getString('bearer_token');
       final response = await http
           .post(
-        Uri.parse('$baseUrl/auth/refresh'),
+        Uri.parse('$baseUrl/api/auth/refresh'),
         headers: {
           'Authorization': 'Bearer $currentToken',
           'Accept': 'application/json',
@@ -83,86 +184,6 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<void> _checkLoginStatus() async {
-    debugPrint('[AuthController] Checking login status...');
-    try {
-      isLoading.value = true;
-
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('bearer_token') ?? '';
-      final storedRole = prefs.getString('role')?.toLowerCase() ?? '';
-      final storedHasProfile = prefs.getBool('hasProfile') ?? false;
-      final storedEmail = prefs.getString('email') ?? '';
-
-      debugPrint('[AuthController] Stored token: ${token.isNotEmpty ? "exists" : "missing"}');
-      debugPrint('[AuthController] Stored role: $storedRole');
-      debugPrint('[AuthController] Stored hasProfile: $storedHasProfile');
-      debugPrint('[AuthController] Stored email: $storedEmail');
-
-      // Check if we have valid stored credentials
-      if (token.isNotEmpty && storedRole.isNotEmpty && storedEmail.isNotEmpty) {
-        debugPrint('[AuthController] Found stored credentials, restoring state...');
-
-        // Restore state from SharedPreferences
-        isLoggedIn.value = true;
-        role.value = storedRole;
-        hasProfile.value = storedHasProfile;
-
-        // Verify Firebase auth state matches
-        final currentUser = FirebaseAuth.instance.currentUser;
-        if (currentUser == null) {
-          debugPrint('[AuthController] Firebase user missing but token exists, attempting to restore Firebase session...');
-          try {
-            // Try to sign in with stored email (this is a simplified approach)
-            // In production, you'd need to store password securely or use token-based auth
-            debugPrint('[AuthController] Cannot automatically restore Firebase session. User needs to login again.');
-            await _clearStoredData(prefs);
-            return;
-          } catch (e) {
-            debugPrint('[AuthController] Error restoring Firebase session: $e');
-            await _clearStoredData(prefs);
-            return;
-          }
-        } else {
-          debugPrint('[AuthController] Firebase user found, session is valid');
-          navigateBasedOnRole();
-          return;
-        }
-      }
-
-      // If no stored credentials, check Firebase auth state
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null) {
-        debugPrint('[AuthController] Firebase user found but no stored credentials, checking profile...');
-
-        if (token.isEmpty) {
-          debugPrint('[AuthController] No token found with Firebase user');
-          // User is logged into Firebase but not Laravel - need to re-login
-          await FirebaseAuth.instance.signOut();
-          await _clearStoredData(prefs);
-          return;
-        }
-
-        try {
-          // Check profile status
-          await _checkProfileStatus(token, prefs);
-          navigateBasedOnRole();
-        } catch (e) {
-          debugPrint('[AuthController] Error checking profile: $e');
-          await _clearStoredData(prefs);
-        }
-      } else {
-        debugPrint('[AuthController] No active session found');
-        await _clearStoredData(prefs);
-      }
-    } catch (e) {
-      debugPrint('[AuthController] Error checking login status: $e');
-      await _clearStoredData(await SharedPreferences.getInstance());
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
   Future<void> _clearStoredData(SharedPreferences prefs) async {
     isLoggedIn.value = false;
     role.value = '';
@@ -174,64 +195,6 @@ class AuthController extends GetxController {
     await prefs.setString('user_id', '');
     await prefs.setString('name', '');
     debugPrint('[AuthController] Cleared all stored data');
-  }
-
-  Future<void> _checkProfileStatus(String token, SharedPreferences prefs) async {
-    try {
-      final storedRole = prefs.getString('role')?.toLowerCase();
-      debugPrint('[AuthController] Checking profile for role: $storedRole');
-
-      if (storedRole == null || storedRole.isEmpty) {
-        throw Exception('No role available for profile check');
-      }
-
-      String endpoint;
-      switch (storedRole) {
-        case 'plumber':
-          endpoint = '$baseUrl/api/profiles/check-plumber';
-          break;
-        case 'electrician':
-          endpoint = '$baseUrl/api/profiles/check-electrician';
-          break;
-        case 'cleaner':
-          endpoint = '$baseUrl/api/cleaner/profile/check';
-          break;
-        default:
-          throw Exception('Unsupported role: $storedRole');
-      }
-
-      final response = await http.get(
-        Uri.parse(endpoint),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 10));
-
-      debugPrint('[AuthController] Profile check response: ${response.statusCode} ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          final profileData = data['data'] ?? data;
-
-          hasProfile.value = profileData['exists'] ?? false;
-          role.value = storedRole;
-
-          await prefs.setBool('hasProfile', hasProfile.value);
-          await prefs.setString('role', role.value);
-
-          debugPrint('[AuthController] Profile exists: ${hasProfile.value}, Role: ${role.value}');
-        } else {
-          throw Exception(data['message'] ?? 'Profile check failed');
-        }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
-      }
-    } catch (e) {
-      debugPrint('[AuthController] Error checking profile status: $e');
-      rethrow;
-    }
   }
 
   Future<void> login(String email, String password) async {
@@ -268,8 +231,8 @@ class AuthController extends GetxController {
         token: laravelResponse['access_token'],
         role: userRole,
         userId: userData['id'],
-        name: userData['name'],
-        email: userData['email'],
+        name: userData['name']?.toString() ?? '',
+        email: userData['email']?.toString() ?? email,
       );
 
       // 4) Check profile existence (backend)
@@ -300,7 +263,7 @@ class AuthController extends GetxController {
           endpoint = '$baseUrl/api/profiles/check-plumber';
           break;
         case 'electrician':
-          endpoint = '$baseUrl/api/profiles/check-electrician';
+          endpoint = '$baseUrl/api/electrician/profile/check';
           break;
         case 'cleaner':
           endpoint = '$baseUrl/api/cleaner/profile/check';

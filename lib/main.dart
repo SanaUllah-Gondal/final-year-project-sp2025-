@@ -53,6 +53,8 @@ Future<void> main() async {
           case 'cleaner':
             initialRoute = AppRoutes.CLEANER_DASHBOARD;
             break;
+          default:
+            initialRoute = AppRoutes.HOME;
         }
       } else {
         // token exists but profile incomplete
@@ -69,6 +71,8 @@ Future<void> main() async {
           case 'cleaner':
             initialRoute = AppRoutes.CLEANER_PROFILE;
             break;
+          default:
+            initialRoute = AppRoutes.USER_PROFILE;
         }
       }
     }

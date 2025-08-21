@@ -13,6 +13,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 import 'package:email_validator/email_validator.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../routes/app_pages.dart';
 import '../Apis.dart';
 
@@ -350,6 +351,10 @@ class ElectricianProfileController extends GetxController {
         final responseData = json.decode(response.body);
         successMessage.value = responseData['message'] ??
             (isUpdate ? 'Profile updated successfully' : 'Profile created successfully');
+
+        final authController = Get.find<AuthController>();
+        authController.hasProfile.value = true;
+
         Get.toNamed(AppRoutes.ELECTRICIAN_DASHBOARD);
         if (!isUpdate && responseData['location_token'] != null) {
           final prefs = await SharedPreferences.getInstance();

@@ -11,10 +11,9 @@ import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
-import 'package:email_validator/email_validator.dart';
-
 import '../../controllers/auth_controller.dart';
 import '../../routes/app_pages.dart';
+import '../Apis.dart' as Apis;
 
 class UserLocation {
   final double latitude;
@@ -28,14 +27,11 @@ class UserLocation {
   });
 }
 
-class PlumberProfileController extends GetxController {
+class UserProfileController extends GetxController {
   // Form controllers
   final TextEditingController nameController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController experienceController = TextEditingController();
-  final TextEditingController skillsController = TextEditingController();
-  final TextEditingController areaController = TextEditingController();
-  final TextEditingController rateController = TextEditingController();
+  final TextEditingController bioController = TextEditingController();
+  final TextEditingController locationController = TextEditingController();
   final TextEditingController contactController = TextEditingController();
   final TextEditingController roleController = TextEditingController();
 
@@ -43,17 +39,17 @@ class PlumberProfileController extends GetxController {
   final Rx<File?> profileImage = Rx<File?>(null);
   final RxString bearerToken = ''.obs;
   final Rx<UserLocation?> userLocation = Rx<UserLocation?>(null);
-  final RxString locationToken = ''.obs;
   final RxBool isLoading = false.obs;
+  final RxBool isLocationLoading = false.obs;
   final RxBool profileExists = false.obs;
   final RxString errorMessage = ''.obs;
   final RxString successMessage = ''.obs;
   final RxString debugLog = ''.obs;
 
   // Constants
-  final String baseUrl = 'http://10.0.2.2:8000/api';
   final Color darkBlue = const Color(0xFF003E6B);
   final Color tealBlue = const Color(0xFF00A8A8);
+  final baseUrl = "${Apis.baseUrl}/api";
 
   @override
   void onInit() {
@@ -81,11 +77,9 @@ class PlumberProfileController extends GetxController {
       final prefs = await SharedPreferences.getInstance();
       final user = FirebaseAuth.instance.currentUser;
 
-      roleController.text = prefs.getString('role') ?? 'plumber';
+      roleController.text = prefs.getString('role') ?? 'user';
       nameController.text = prefs.getString('name') ?? '';
-      emailController.text = user?.email ?? prefs.getString('email') ?? '';
       bearerToken.value = prefs.getString('bearer_token') ?? '';
-      locationToken.value = prefs.getString('location_token') ?? '';
 
       await checkExistingProfile();
     } catch (e) {
@@ -159,7 +153,7 @@ class PlumberProfileController extends GetxController {
 
       isLoading.value = true;
       final response = await _authenticatedRequest(
-        '$baseUrl/profiles/check-plumber',
+        '$baseUrl/user/profile/check',
       ).timeout(const Duration(seconds: 10));
 
       _logDebug('Response status: ${response.statusCode}');
@@ -169,7 +163,7 @@ class PlumberProfileController extends GetxController {
         final data = json.decode(response.body);
         if (data['exists'] == true) {
           profileExists.value = true;
-          await loadExistingProfile(data['profile_id']);
+          await loadExistingProfile();
         }
       }
     } catch (e) {
@@ -180,9 +174,42 @@ class PlumberProfileController extends GetxController {
     }
   }
 
+  Future<void> loadExistingProfile() async {
+    try {
+      _logDebug('Loading existing profile...');
+      isLoading.value = true;
+
+      final response = await _authenticatedRequest(
+        '$baseUrl/user/profile/my',
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body)['data'];
+        nameController.text = data['full_name'] ?? '';
+        bioController.text = data['short_bio'] ?? '';
+        locationController.text = data['location'] ?? '';
+        contactController.text = data['contact_number'] ?? '';
+
+        if (data['coordinates'] != null) {
+          userLocation.value = UserLocation(
+            latitude: (data['coordinates']['latitude'] as num?)?.toDouble() ?? 0.0,
+            longitude: (data['coordinates']['longitude'] as num?)?.toDouble() ?? 0.0,
+            address: data['coordinates']['address'] ?? '',
+          );
+        }
+      }
+    } catch (e) {
+      errorMessage.value = 'Load profile error: $e';
+      _logDebug(errorMessage.value);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // UPDATED: Get current location with better error handling (like electrician)
   Future<void> getLiveLocation() async {
     try {
-      isLoading.value = true;
+      isLocationLoading.value = true;
       errorMessage.value = '';
 
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -213,12 +240,12 @@ class PlumberProfileController extends GetxController {
 
       String address = placemarks.isNotEmpty
           ? [
-        placemarks.first.street,
-        placemarks.first.subLocality,
-        placemarks.first.locality,
-        placemarks.first.administrativeArea,
-        placemarks.first.postalCode,
-        placemarks.first.country
+        placemarks.first.street ?? '',
+        placemarks.first.subLocality ?? '',
+        placemarks.first.locality ?? '',
+        placemarks.first.administrativeArea ?? '',
+        placemarks.first.postalCode ?? '',
+        placemarks.first.country ?? ''
       ].where((part) => part != null && part.isNotEmpty).join(', ')
           : 'Unknown Location';
 
@@ -228,46 +255,20 @@ class PlumberProfileController extends GetxController {
         address: address,
       );
 
-      areaController.text = address;
+      locationController.text = address;
+
+      // Show success message
+      successMessage.value = "Location updated successfully!";
+
+      _logDebug('Location obtained: Lat: ${position.latitude}, Lng: ${position.longitude}, Address: $address');
+
+    } on TimeoutException {
+      errorMessage.value = "Location request timed out. Please try again.";
     } catch (e) {
-      errorMessage.value = "Error getting location: $e";
+      errorMessage.value = "Error getting location: ${e.toString()}";
+      _logDebug('Location error: $e');
     } finally {
-      isLoading.value = false;
-    }
-  }
-
-  Future<void> loadExistingProfile(String profileId) async {
-    try {
-      _logDebug('Loading existing profile for ID: $profileId');
-      isLoading.value = true;
-
-      final response = await _authenticatedRequest(
-        '$baseUrl/profiles/plumber/$profileId',
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body)['data'];
-        nameController.text = data['full_name'] ?? '';
-        emailController.text = data['email'] ?? '';
-        experienceController.text = data['experience'] ?? '';
-        skillsController.text = data['skill'] ?? '';
-        areaController.text = data['service_area'] ?? '';
-        rateController.text = data['hourly_rate']?.toString() ?? '';
-        contactController.text = data['contact_number'] ?? '';
-
-        userLocation.value = UserLocation(
-          latitude: (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0,
-          longitude: (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
-          address: data['location']?['address'] ?? '',
-        );
-
-        locationToken.value = data['location_token'] ?? locationToken.value;
-      }
-    } catch (e) {
-      errorMessage.value = 'Load profile error: $e';
-      _logDebug(errorMessage.value);
-    } finally {
-      isLoading.value = false;
+      isLocationLoading.value = false;
     }
   }
 
@@ -308,17 +309,14 @@ class PlumberProfileController extends GetxController {
       }
 
       final isUpdate = profileExists.value;
-      final url = isUpdate ? '$baseUrl/profiles/plumber/me' : '$baseUrl/profiles/plumber';
+      final url = isUpdate ? '$baseUrl/user/profile' : '$baseUrl/user/profile';
       final method = isUpdate ? 'PUT' : 'POST';
 
       // Convert all values to strings
       final fields = {
         'full_name': nameController.text.trim(),
-        'email': emailController.text.trim(),
-        'experience': experienceController.text.trim(),
-        'skill': skillsController.text.trim(),
-        'service_area': areaController.text.trim(),
-        'hourly_rate': rateController.text.trim(), // Keep as string
+        'short_bio': bioController.text.trim(),
+        'location': locationController.text.trim(),
         'contact_number': contactController.text.trim(),
         if (userLocation.value != null) ...{
           'latitude': userLocation.value!.latitude.toString(),
@@ -331,7 +329,7 @@ class PlumberProfileController extends GetxController {
       if (profileImage.value != null) {
         final mimeType = lookupMimeType(profileImage.value!.path) ?? 'image/jpeg';
         files.add(await http.MultipartFile.fromPath(
-          'plumber_image',
+          'user_image',
           profileImage.value!.path,
           contentType: MediaType.parse(mimeType),
         ));
@@ -351,16 +349,20 @@ class PlumberProfileController extends GetxController {
         final responseData = json.decode(response.body);
         successMessage.value = responseData['message'] ??
             (isUpdate ? 'Profile updated successfully' : 'Profile created successfully');
-        Get.toNamed(AppRoutes.PLUMBER_DASHBOARD);
+
+        profileExists.value = true;
+
+        // Set hasProfile in shared preferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('hasProfile', true);
+
+        // Update auth controller state
         final authController = Get.find<AuthController>();
         authController.hasProfile.value = true;
 
-        if (!isUpdate && responseData['location_token'] != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('location_token', responseData['location_token']);
-          locationToken.value = responseData['location_token'];
-          profileExists.value = true;
-        }
+        // Navigate to dashboard
+        Get.offAllNamed(AppRoutes.HOME);
+
       } else if (response.statusCode == 422) {
         // Handle validation errors
         final errorData = json.decode(response.body);
@@ -395,45 +397,20 @@ class PlumberProfileController extends GetxController {
       errors['name'] = 'Name must be less than 100 characters';
     }
 
-    if (emailController.text.isEmpty) {
-      errors['email'] = 'Email is required';
-    } else if (!EmailValidator.validate(emailController.text)) {
-      errors['email'] = 'Please enter a valid email';
+    if (bioController.text.length > 255) {
+      errors['bio'] = 'Bio must be less than 255 characters';
     }
 
-    if (experienceController.text.isEmpty) {
-      errors['experience'] = 'Experience is required';
-    } else if (experienceController.text.length > 50) {
-      errors['experience'] = 'Experience must be less than 50 characters';
+    if (locationController.text.isEmpty) {
+      errors['location'] = 'Location is required';
+    } else if (locationController.text.length > 100) {
+      errors['location'] = 'Location must be less than 100 characters';
     }
 
-    if (skillsController.text.isEmpty) {
-      errors['skills'] = 'Skills are required';
-    } else if (skillsController.text.length > 100) {
-      errors['skills'] = 'Skills must be less than 100 characters';
-    }
-
-    if (areaController.text.isEmpty) {
-      errors['area'] = 'Service Area is required';
-    } else if (areaController.text.length > 255) {
-      errors['area'] = 'Service Area must be less than 255 characters';
-    }
-
-    final hourlyRate = double.tryParse(rateController.text);
-    if (rateController.text.isEmpty) {
-      errors['rate'] = 'Hourly rate is required';
-    } else if (hourlyRate == null) {
-      errors['rate'] = 'Please enter a valid number';
-    } else if (hourlyRate < 0 || hourlyRate > 999999.99) {
-      errors['rate'] = 'Hourly rate must be between 0 and 999,999.99';
-    }
-
-    if (!RegExp(r'^[0-9]{10,11}$').hasMatch(contactController.text)) {
+    if (contactController.text.isEmpty) {
+      errors['contact'] = 'Contact number is required';
+    } else if (!RegExp(r'^[0-9]{10,11}$').hasMatch(contactController.text)) {
       errors['contact'] = 'Please enter a valid 10-11 digit contact number';
-    }
-
-    if (profileImage.value == null && !profileExists.value) {
-      errors['profileImage'] = 'Profile image is required';
     }
 
     return errors;
@@ -477,11 +454,5 @@ class PlumberProfileController extends GetxController {
       bearerToken.value = '';
       throw Exception('Token refresh error: $e');
     }
-  }
-
-  Future<String> _getToken() async {
-    if (bearerToken.isNotEmpty) return bearerToken.value;
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('bearer_token') ?? '';
   }
 }

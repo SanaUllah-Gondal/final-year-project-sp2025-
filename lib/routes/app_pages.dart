@@ -16,6 +16,7 @@ import 'package:plumber_project/pages/users/dashboard.dart';
 import 'package:plumber_project/pages/users/profile.dart';
 
 import '../pages/authentication/auth_service.dart';
+import '../pages/users/user_profile.dart';
 import '../services/storage_service.dart';
 
 abstract class AppRoutes {
@@ -57,7 +58,7 @@ class AppPages {
     ),
     GetPage(
       name: AppRoutes.USER_PROFILE,
-      page: () => ProfileScreen(),
+      page: () => UserProfilePage(),
     ),
     GetPage(
       name: AppRoutes.PLUMBER_DASHBOARD,
