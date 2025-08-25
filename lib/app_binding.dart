@@ -3,6 +3,9 @@ import 'package:get/get.dart';
 import 'package:plumber_project/controllers/auth_controller.dart';
 import 'package:plumber_project/controllers/dashboard_controller.dart';
 import 'package:plumber_project/pages/authentication/auth_service.dart';
+import 'package:plumber_project/pages/cleaner/cleaner_dashboard_controller.dart';
+import 'package:plumber_project/pages/electrition/electrician_dashboard_controller.dart';
+import 'package:plumber_project/pages/plumber/plumber_dashboard_controller.dart';
 import 'package:plumber_project/services/api_service.dart';
 import 'package:plumber_project/services/storage_service.dart';
 
@@ -23,6 +26,9 @@ class AppBindings extends Bindings {
 
     // Initialize DashboardController lazily since it might not be needed immediately
     Get.lazyPut(() => DashboardController(), fenix: true);
+    Get.lazyPut(() => PlumberDashboardController(), fenix: true);
+    Get.lazyPut(() => CleanerDashboardController(), fenix: true);
+    Get.lazyPut(() => ElectricianDashboardController(), fenix: true);
 
     // Call completeInitialization after the app is fully loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {

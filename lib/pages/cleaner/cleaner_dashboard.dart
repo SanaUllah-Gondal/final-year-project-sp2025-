@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:plumber_project/controllers/dashboard_controller.dart';
-import 'package:plumber_project/pages/emergency.dart';
+import 'package:plumber_project/pages/cleaner/cleaner_dashboard_controller.dart';
+import 'package:plumber_project/pages/cleaner/cleaner_appointment.dart';
+import 'package:plumber_project/pages/cleaner/cleaner_widgets/cleaner_card.dart';
 import 'package:plumber_project/pages/users/profile.dart';
 import 'package:plumber_project/pages/notification.dart';
 
-import 'cleaner_appointment.dart';
-import 'cleaner_widgets/cleaner_card.dart';
-
 final Color darkBlue = Color(0xFF003E6B);
-final Color tealColor = Color(0xFF008080); // Cleaner-specific teal color
+final Color tealColor = Color(0xFF008080);
+final Color onlineColor = Color(0xFF4CAF50);
+final Color offlineColor = Color(0xFFF44336);
+final Color workingColor = Color(0xFFFF9800);
 
 class CleanerDashboard extends StatelessWidget {
   final DashboardController _dashboardController = Get.find();
+  final CleanerDashboardController _cleanerController = Get.put(CleanerDashboardController());
 
   @override
   Widget build(BuildContext context) {
@@ -24,12 +27,15 @@ class CleanerDashboard extends StatelessWidget {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 28,
-            color: Colors.white, // Changed to white for better visibility
+            color: Colors.white,
           ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          Obx(() => _buildStatusIndicator()),
+        ],
       ),
       body: Obx(() => _pages[_dashboardController.selectedIndex.value]),
       bottomNavigationBar: Obx(
@@ -38,7 +44,7 @@ class CleanerDashboard extends StatelessWidget {
           onTap: (index) => _onItemTapped(index, context),
           selectedItemColor: Colors.yellow,
           unselectedItemColor: Colors.white,
-          backgroundColor: tealColor, // Using cleaner-specific teal color
+          backgroundColor: tealColor,
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
             BottomNavigationBarItem(
@@ -50,6 +56,33 @@ class CleanerDashboard extends StatelessWidget {
     );
   }
 
+  Widget _buildStatusIndicator() {
+    return Container(
+      margin: EdgeInsets.only(right: 16),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: _cleanerController.isWorking.value
+            ? workingColor
+            : _cleanerController.isOnline.value
+            ? onlineColor
+            : offlineColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Obx(() => Text(
+        _cleanerController.isWorking.value
+            ? 'Working'
+            : _cleanerController.isOnline.value
+            ? 'Online'
+            : 'Offline',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+      )),
+    );
+  }
+
   final List<Widget> _pages = [
     CleanerHomeContent(),
     NotificationsScreen(),
@@ -58,17 +91,10 @@ class CleanerDashboard extends StatelessWidget {
 
   void _onItemTapped(int index, BuildContext context) {
     if (index == 1) {
-      if (_dashboardController.userRole.value == 'cleaner') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => NotificationsScreen()),
-        );
-      } else {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => EmergencyScreen()),
-        );
-      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => NotificationsScreen()),
+      );
     } else if (index == 2) {
       Navigator.push(
         context,
@@ -81,51 +107,125 @@ class CleanerDashboard extends StatelessWidget {
 }
 
 class CleanerHomeContent extends StatelessWidget {
+  final CleanerDashboardController _controller = Get.find();
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: GridView.count(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+      child: Column(
         children: [
-          CleanerDashboardCard(
-            title: "New Requests",
-            icon: Icons.cleaning_services, // Cleaner-specific icon
-            gradientColors: [Color(0xFF00B4DB), Color(0xFF0083B0)], // Ocean blue gradient
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => CleanerAppointmentList()),
-              );
-            },
-          ),
-          CleanerDashboardCard(
-            title: "Ongoing Jobs",
-            icon: Icons.work,
-            gradientColors: [Color(0xFF56CCF2), Color(0xFF2F80ED)], // Light blue gradient
-            onTap: () {
-              // Navigate to ongoing jobs
-            },
-          ),
-          CleanerDashboardCard(
-            title: "Completed Jobs",
-            icon: Icons.check_circle,
-            gradientColors: [Color(0xFF76B852), Color(0xFF8DC26F)], // Green gradient
-            onTap: () {
-              // Navigate to completed jobs
-            },
-          ),
-          CleanerDashboardCard(
-            title: "Earnings",
-            icon: Icons.attach_money,
-            gradientColors: [Color(0xFFDA22FF), Color(0xFF9733EE)], // Purple gradient
-            onTap: () {
-              // Navigate to earnings
-            },
+          // Online/Offline Toggle Button
+          Obx(() => _buildStatusToggleButton()),
+          SizedBox(height: 20),
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              children: [
+                CleanerDashboardCard(
+                  title: "New Requests",
+                  icon: Icons.cleaning_services,
+                  gradientColors: [Color(0xFF00B4DB), Color(0xFF0083B0)],
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => CleanerAppointmentList()),
+                    );
+                  },
+                ),
+                CleanerDashboardCard(
+                  title: "Ongoing Jobs",
+                  icon: Icons.work,
+                  gradientColors: [Color(0xFF56CCF2), Color(0xFF2F80ED)],
+                  onTap: () {
+                    // Handle ongoing jobs tap
+                    _controller.updateWorkingStatus(true);
+                  },
+                ),
+                CleanerDashboardCard(
+                  title: "Completed Jobs",
+                  icon: Icons.check_circle,
+                  gradientColors: [Color(0xFF76B852), Color(0xFF8DC26F)],
+                  onTap: () {
+                    // Handle completed jobs tap
+                    _controller.updateWorkingStatus(false);
+                  },
+                ),
+                CleanerDashboardCard(
+                  title: "Earnings",
+                  icon: Icons.attach_money,
+                  gradientColors: [Color(0xFFDA22FF), Color(0xFF9733EE)],
+                  onTap: () {
+                    // Handle earnings tap
+                  },
+                ),
+              ],
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStatusToggleButton() {
+    return GestureDetector(
+      onTap: _controller.toggleOnlineStatus,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: _controller.isOnline.value
+                ? [offlineColor, Colors.redAccent]
+                : [onlineColor, Colors.greenAccent],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: _controller.isOnline.value
+                  ? offlineColor.withOpacity(0.4)
+                  : onlineColor.withOpacity(0.4),
+              offset: Offset(0, 6),
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Obx(() => Icon(
+              _controller.isOnline.value ? Icons.wifi_off : Icons.wifi,
+              color: Colors.white,
+              size: 24,
+            )),
+            SizedBox(width: 10),
+            Obx(() => Text(
+              _controller.isOnline.value ? 'Go Offline' : 'Go Online',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            )),
+            Obx(() => _controller.isLoading.value
+                ? Padding(
+              padding: EdgeInsets.only(left: 10),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+            )
+                : SizedBox.shrink()),
+          ],
+        ),
       ),
     );
   }
