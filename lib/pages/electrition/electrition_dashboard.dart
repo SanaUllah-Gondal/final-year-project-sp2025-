@@ -4,7 +4,7 @@ import 'package:plumber_project/controllers/dashboard_controller.dart';
 import 'package:plumber_project/pages/users/profile.dart';
 import 'package:plumber_project/pages/notification.dart';
 
-import 'electrician_dashboard_controller.dart';
+import 'controllers/electrician_dashboard_controller.dart';
 import 'electrition_widgets/electrition_cards.dart';
 
 final Color darkBlue = Color(0xFF003E6B);

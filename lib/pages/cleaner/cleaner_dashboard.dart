@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:plumber_project/controllers/dashboard_controller.dart';
-import 'package:plumber_project/pages/cleaner/cleaner_dashboard_controller.dart';
+import 'package:plumber_project/pages/cleaner/controllers/cleaner_dashboard_controller.dart';
 import 'package:plumber_project/pages/cleaner/cleaner_appointment.dart';
 import 'package:plumber_project/pages/cleaner/cleaner_widgets/cleaner_card.dart';
 import 'package:plumber_project/pages/users/profile.dart';

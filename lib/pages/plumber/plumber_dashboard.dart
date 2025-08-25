@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:plumber_project/controllers/dashboard_controller.dart';
-import 'package:plumber_project/pages/plumber/plumber_dashboard_controller.dart';
+import 'package:plumber_project/pages/plumber/controllers/plumber_dashboard_controller.dart';
 import 'package:plumber_project/pages/plumber/plumberrequest.dart';
-import 'package:plumber_project/pages/plumber/plumber_dashboard_card.dart';
+import 'package:plumber_project/pages/plumber/plumber_widgets/plumber_dashboard_card.dart';
 import 'package:plumber_project/pages/users/profile.dart';
 import 'package:plumber_project/pages/notification.dart';
 

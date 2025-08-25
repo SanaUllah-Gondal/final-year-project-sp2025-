@@ -3,9 +3,9 @@ import 'package:get/get.dart';
 import 'package:plumber_project/controllers/auth_controller.dart';
 import 'package:plumber_project/controllers/dashboard_controller.dart';
 import 'package:plumber_project/pages/authentication/auth_service.dart';
-import 'package:plumber_project/pages/cleaner/cleaner_dashboard_controller.dart';
-import 'package:plumber_project/pages/electrition/electrician_dashboard_controller.dart';
-import 'package:plumber_project/pages/plumber/plumber_dashboard_controller.dart';
+import 'package:plumber_project/pages/cleaner/controllers/cleaner_dashboard_controller.dart';
+import 'package:plumber_project/pages/electrition/controllers/electrician_dashboard_controller.dart';
+import 'package:plumber_project/pages/plumber/controllers/plumber_dashboard_controller.dart';
 import 'package:plumber_project/services/api_service.dart';
 import 'package:plumber_project/services/storage_service.dart';
 

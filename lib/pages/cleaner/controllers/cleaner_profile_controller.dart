@@ -13,9 +13,9 @@ import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 import 'package:email_validator/email_validator.dart';
 
-import '../../controllers/auth_controller.dart';
-import '../../routes/app_pages.dart';
-import '../Apis.dart';
+import '../../../controllers/auth_controller.dart';
+import '../../../routes/app_pages.dart';
+import '../../Apis.dart';
 
 class UserLocation {
   final double latitude;

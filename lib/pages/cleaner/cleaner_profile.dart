@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'cleaner_profile_controller.dart';
+import 'controllers/cleaner_profile_controller.dart';
 
 class CleanerProfilePage extends StatelessWidget {
   final CleanerProfileController controller = Get.put(CleanerProfileController());

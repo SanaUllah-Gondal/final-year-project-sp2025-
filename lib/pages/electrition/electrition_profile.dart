@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'electrician_profile_controller.dart';
+import 'controllers/electrician_profile_controller.dart';
 
 class ElectricianProfilePage extends StatelessWidget {
   final ElectricianProfileController controller = Get.put(ElectricianProfileController());
