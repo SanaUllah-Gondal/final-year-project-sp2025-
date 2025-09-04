@@ -1,0 +1,2 @@
+# project_structure.md
+This is a placeholder file for SkillLink project.
