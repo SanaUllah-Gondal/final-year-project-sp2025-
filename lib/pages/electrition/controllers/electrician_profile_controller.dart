@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -352,6 +353,13 @@ class ElectricianProfileController extends GetxController {
         successMessage.value = responseData['message'] ??
             (isUpdate ? 'Profile updated successfully' : 'Profile created successfully');
 
+        try {
+          await saveProfileToCloud;
+        }catch (e) {
+          _logDebug('Firebase backup failed: $e');
+        }
+
+
         final authController = Get.find<AuthController>();
         authController.hasProfile.value = true;
 
@@ -479,7 +487,55 @@ class ElectricianProfileController extends GetxController {
       throw Exception('Token refresh error: $e');
     }
   }
+  Future<void> saveProfileToCloud() async {
+    try {
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Convert image to base64 string if exists
+      String? imageBase64;
+      if (profileImage.value != null) {
+        final imageBytes = await profileImage.value!.readAsBytes();
+        imageBase64 = base64Encode(imageBytes);
+      }
+
+
+      final electricianData = {
+        'userId': user.uid,
+        'fullName': nameController.text.trim(),
+        'email': emailController.text.trim(),
+        'experience': experienceController.text.trim(),
+        'skills': skillsController.text.trim(),
+        'serviceArea': areaController.text.trim(),
+        'hourlyRate': double.tryParse(rateController.text.trim()) ?? 0.0,
+        'contactNumber': contactController.text.trim(),
+        'profileImage': imageBase64, // Base64 encoded image string
+        'location': userLocation.value != null ? {
+          'latitude': userLocation.value!.latitude,
+          'longitude': userLocation.value!.longitude,
+          'address': userLocation.value!.address,
+        } : null,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'role': 'electrician',
+      };
+
+      // Save to Firestore
+      await firestore
+          .collection('electrician')
+          .doc(user.uid)
+          .set(electricianData, SetOptions(merge: true));
+
+      _logDebug('Electrician profile saved to Firebase successfully');
+    } catch (e) {
+      _logDebug('Error saving to Firebase: $e');
+      throw Exception('Failed to save profile to Firebase: $e');
+    }
+  }
   Future<String> _getToken() async {
     if (bearerToken.isNotEmpty) return bearerToken.value;
     final prefs = await SharedPreferences.getInstance();

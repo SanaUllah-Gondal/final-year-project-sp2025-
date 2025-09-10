@@ -6,6 +6,7 @@ import 'package:plumber_project/pages/authentication/auth_service.dart';
 import 'package:plumber_project/pages/cleaner/controllers/cleaner_dashboard_controller.dart';
 import 'package:plumber_project/pages/electrition/controllers/electrician_dashboard_controller.dart';
 import 'package:plumber_project/pages/plumber/controllers/plumber_dashboard_controller.dart';
+import 'package:plumber_project/pages/users/user_dashboard_controller.dart';
 import 'package:plumber_project/services/api_service.dart';
 import 'package:plumber_project/services/storage_service.dart';
 
@@ -29,6 +30,8 @@ class AppBindings extends Bindings {
     Get.lazyPut(() => PlumberDashboardController(), fenix: true);
     Get.lazyPut(() => CleanerDashboardController(), fenix: true);
     Get.lazyPut(() => ElectricianDashboardController(), fenix: true);
+    Get.lazyPut(() => HomeController(), fenix: true);
+
 
     // Call completeInitialization after the app is fully loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {

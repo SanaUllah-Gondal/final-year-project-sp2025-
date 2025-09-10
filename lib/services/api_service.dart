@@ -112,17 +112,20 @@ class ApiService extends GetxService {
     }
   }
 
-
-// Toggle online/offline status - SIMPLIFIED (no user ID needed)
+  // Toggle online/offline status - UPDATED for new structure
   Future<Map<String, dynamic>> toggleOnlineStatus({
     required String providerType,
     required bool isOnline,
-    required String location,
+    required String addressName,
+    required double latitude,
+    required double longitude,
   }) async {
     try {
       return await post('/api/providers/$providerType/toggle-status', body: {
         'is_online': isOnline,
-        'current_location': location,
+        'address_name': addressName,
+        'latitude': latitude,
+        'longitude': longitude,
       });
     } catch (e) {
       _log('Toggle online status error: $e');
@@ -130,7 +133,7 @@ class ApiService extends GetxService {
     }
   }
 
-// Update working status - SIMPLIFIED
+  // Update working status - SIMPLIFIED
   Future<Map<String, dynamic>> updateWorkingStatus({
     required String providerType,
     required bool isWorking,
@@ -145,7 +148,7 @@ class ApiService extends GetxService {
     }
   }
 
-// Get provider status - SIMPLIFIED
+  // Get provider status - SIMPLIFIED
   Future<Map<String, dynamic>> getProviderStatus(String providerType) async {
     try {
       return await get('/api/providers/$providerType/status');
@@ -155,16 +158,16 @@ class ApiService extends GetxService {
     }
   }
 
-// Update provider location - SIMPLIFIED (no user ID needed)
+  // Update provider location - UPDATED for new structure
   Future<Map<String, dynamic>> updateProviderLocation({
     required String providerType,
-    required String location,
+    required String addressName,
     required double latitude,
     required double longitude,
   }) async {
     try {
       return await post('/api/providers/$providerType/update-location', body: {
-        'location': location,
+        'address_name': addressName,
         'latitude': latitude,
         'longitude': longitude,
       });
@@ -184,7 +187,6 @@ class ApiService extends GetxService {
     }
   }
 
-
   // Get plumber profile by ID
   Future<Map<String, dynamic>> getPlumberProfileById(int id) async {
     try {
@@ -193,12 +195,23 @@ class ApiService extends GetxService {
       _log('Get plumber profile error: $e');
       rethrow;
     }
+  }
 
-  }  Future<Map<String, dynamic>> getMyElectricianProfile() async {
+  // Get detailed plumber profile with phone and image
+  Future<Map<String, dynamic>> getPlumberProfileDetails(int profileId) async {
+    try {
+      return await get('/api/profiles/plumber/$profileId');
+    } catch (e) {
+      _log('Get plumber profile details error: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> getMyElectricianProfile() async {
     try {
       return await get('/api/electrician/profiles/my');
     } catch (e) {
-      _log('Get plumber profile error: $e');
+      _log('Get electrician profile error: $e');
       rethrow;
     }
   }
@@ -206,19 +219,19 @@ class ApiService extends GetxService {
   // Get my plumber profile (protected)
   Future<Map<String, dynamic>> getMyPlumberProfile() async {
     try {
-      return await get('/api/cleaner/profiles/my');
+      return await get('/api/plumber/profiles/my');
     } catch (e) {
       _log('Get my plumber profile error: $e');
       rethrow;
     }
   }
 
-
+  // Get my cleaner profile
   Future<Map<String, dynamic>> getMyCleanerProfile() async {
     try {
-      return await get('/api/profiles/plumber/me');
+      return await get('/api/cleaner/profiles/my');
     } catch (e) {
-      _log('Get my plumber profile error: $e');
+      _log('Get my cleaner profile error: $e');
       rethrow;
     }
   }
@@ -246,11 +259,63 @@ class ApiService extends GetxService {
   // Get user info (protected)
   Future<Map<String, dynamic>> getMe() async {
     try {
-      return await get('api/me');
+      return await get('/api/me');
     } catch (e) {
       _log('Get user info error: $e');
       rethrow;
     }
   }
 
+  // Additional methods that might be needed for the new structure
+
+  // Update cleaner profile
+  Future<Map<String, dynamic>> updateCleanerProfile(Map<String, dynamic> data) async {
+    try {
+      return await put('/api/profiles/cleaner/my', body: data);
+    } catch (e) {
+      _log('Update cleaner profile error: $e');
+      rethrow;
+    }
+  }
+
+  // Update electrician profile
+  Future<Map<String, dynamic>> updateElectricianProfile(Map<String, dynamic> data) async {
+    try {
+      return await put('/api/profiles/electrician/me', body: data);
+    } catch (e) {
+      _log('Update electrician profile error: $e');
+      rethrow;
+    }
+  }
+
+  // Check if cleaner profile exists
+  Future<Map<String, dynamic>> checkCleanerProfileExists() async {
+    try {
+      return await get('/api/profiles/check-cleaner');
+    } catch (e) {
+      _log('Check cleaner profile error: $e');
+      rethrow;
+    }
+  }
+
+  // Check if electrician profile exists
+  Future<Map<String, dynamic>> checkElectricianProfileExists() async {
+    try {
+      return await get('/api/profiles/check-electrician');
+    } catch (e) {
+      _log('Check electrician profile error: $e');
+      rethrow;
+    }
+  }
+
+  // Get user email (if needed separately)
+  Future<String?> getUserEmail() async {
+    try {
+      final userData = await getMe();
+      return userData['email']?.toString();
+    } catch (e) {
+      _log('Get user email error: $e');
+      return null;
+    }
+  }
 }

@@ -7,6 +7,8 @@ class StorageService {
   static const String _kUserId = 'user_id';
   static const String _kEmail = 'email';
   static const String _kName = 'name';
+  static const String _kPhoneNumber = 'phone_number';
+  static const String _kProfileImage = 'profile_image';
   static const String _kHasProfile = 'has_profile';
   static const String _kRememberMe = 'remember_me';
   static const String _kSavedEmail = 'saved_email';
@@ -34,12 +36,22 @@ class StorageService {
     required int userId,
     required String name,
     required String email,
+    String? phoneNumber,
+    String? profileImage,
   }) async {
     await _preferences.setString(_kToken, token);
     await _preferences.setString(_kRole, role);
     await _preferences.setInt(_kUserId, userId);
     await _preferences.setString(_kName, name);
     await _preferences.setString(_kEmail, email);
+
+    if (phoneNumber != null) {
+      await _preferences.setString(_kPhoneNumber, phoneNumber);
+    }
+
+    if (profileImage != null) {
+      await _preferences.setString(_kProfileImage, profileImage);
+    }
   }
 
   /// Getters for stored values
@@ -48,11 +60,23 @@ class StorageService {
   int? getUserId() => _preferences.getInt(_kUserId);
   String? getEmail() => _preferences.getString(_kEmail);
   String? getName() => _preferences.getString(_kName);
+  String? getPhoneNumber() => _preferences.getString(_kPhoneNumber);
+  String? getProfileImage() => _preferences.getString(_kProfileImage);
+
+  /// Setters for phone number and profile image
+  Future<void> savePhoneNumber(String phoneNumber) async {
+    await _preferences.setString(_kPhoneNumber, phoneNumber);
+  }
+
+  Future<void> saveProfileImage(String profileImage) async {
+    await _preferences.setString(_kProfileImage, profileImage);
+  }
 
   /// Profile existence flag
   Future<void> setHasProfile(bool value) async {
     await _preferences.setBool(_kHasProfile, value);
   }
+
   Future<void> setRole(String role) async {
     await _preferences.setString(_kRole, role);
   }

@@ -19,15 +19,13 @@ class AuthController extends GetxController {
   final RxString role = ''.obs;
   final RxBool hasProfile = false.obs;
   final RxBool _initialCheckComplete = false.obs;
+  final RxString bearerToken = ''.obs;
 
   @override
   void onInit() {
     super.onInit();
-    // Don't check login status here - let main() handle initial route
-    // We'll complete initialization after app starts
   }
 
-  // Call this method after app starts to complete initialization
   Future<void> completeInitialization() async {
     if (_initialCheckComplete.value) return;
 
@@ -44,21 +42,15 @@ class AuthController extends GetxController {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('bearer_token') ?? '';
       final storedRole = prefs.getString('role')?.toLowerCase() ?? '';
-      final storedHasProfile = prefs.getBool('hasProfile') ?? false;
       final storedEmail = prefs.getString('email') ?? '';
 
       debugPrint('[AuthController] Stored token: ${token.isNotEmpty ? "exists" : "missing"}');
       debugPrint('[AuthController] Stored role: $storedRole');
-      debugPrint('[AuthController] Stored hasProfile: $storedHasProfile');
       debugPrint('[AuthController] Stored email: $storedEmail');
 
       // If we have valid stored credentials, restore state
       if (token.isNotEmpty && storedRole.isNotEmpty && storedEmail.isNotEmpty) {
         debugPrint('[AuthController] Found stored credentials, restoring state...');
-
-        isLoggedIn.value = true;
-        role.value = storedRole;
-        hasProfile.value = storedHasProfile;
 
         // Verify Firebase auth state matches
         final currentUser = FirebaseAuth.instance.currentUser;
@@ -71,10 +63,20 @@ class AuthController extends GetxController {
 
         debugPrint('[AuthController] Session is valid, user is logged in');
 
-        // If we have a profile, make sure we're on the right screen
-        if (storedHasProfile && Get.currentRoute != _getDashboardRoute(storedRole)) {
+        // Check profile existence with token refresh handling
+        final profileExists = await _checkProfileWithTokenRefresh(token, storedRole);
+
+        isLoggedIn.value = true;
+        role.value = storedRole;
+        hasProfile.value = profileExists;
+
+        // Update stored profile status
+        await prefs.setBool('hasProfile', profileExists);
+
+        // Navigate based on actual profile status
+        if (profileExists && Get.currentRoute != _getDashboardRoute(storedRole)) {
           Get.offAllNamed(_getDashboardRoute(storedRole));
-        } else if (!storedHasProfile && !Get.currentRoute.endsWith('profile')) {
+        } else if (!profileExists && !Get.currentRoute.endsWith('profile')) {
           Get.offAllNamed(_getProfileRoute(storedRole));
         }
 
@@ -98,6 +100,31 @@ class AuthController extends GetxController {
       await _clearStoredData(await SharedPreferences.getInstance());
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<bool> _checkProfileWithTokenRefresh(String token, String userRole) async {
+    try {
+      // First attempt with current token
+      final profileExists = await _checkProfileAfterLogin(token, userRole);
+      return profileExists;
+    } catch (e) {
+      if (e.toString().contains('401') || e.toString().contains('Unauthenticated')) {
+        debugPrint('[AuthController] Token expired, attempting refresh...');
+        try {
+          // Refresh token and retry
+          await refreshToken();
+          final newToken = await _storageService.getToken();
+          if (newToken != null && newToken.isNotEmpty) {
+            return await _checkProfileAfterLogin(newToken, userRole);
+          }
+        } catch (refreshError) {
+          debugPrint('[AuthController] Token refresh failed: $refreshError');
+          // If refresh fails, logout the user
+          await logout();
+        }
+      }
+      return false;
     }
   }
 
@@ -137,7 +164,6 @@ class AuthController extends GetxController {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else if (response.statusCode == 401) {
-        // Handle token expiration
         await refreshToken();
         final newToken = await _storageService.getToken();
         if (newToken != null && newToken.isNotEmpty) {
@@ -158,56 +184,30 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<void> refreshToken() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final currentToken = prefs.getString('bearer_token');
-      final response = await http
-          .post(
-        Uri.parse('$baseUrl/api/auth/refresh'),
-        headers: {
-          'Authorization': 'Bearer $currentToken',
-          'Accept': 'application/json',
-        },
-      )
-          .timeout(const Duration(seconds: 12));
-
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        final newToken = responseData['access_token'];
-        await prefs.setString('bearer_token', newToken);
-      } else {
-        throw Exception('Token refresh failed');
-      }
-    } catch (e) {
-      throw Exception('Token refresh error: $e');
-    }
-  }
-
   Future<void> _clearStoredData(SharedPreferences prefs) async {
     isLoggedIn.value = false;
     role.value = '';
     hasProfile.value = false;
+    bearerToken.value = '';
+
     await prefs.setBool('hasProfile', false);
     await prefs.setString('role', '');
     await prefs.setString('bearer_token', '');
     await prefs.setString('email', '');
     await prefs.setString('user_id', '');
     await prefs.setString('name', '');
+
     debugPrint('[AuthController] Cleared all stored data');
   }
 
   Future<void> login(String email, String password) async {
-    if (isLoading.value) {
-      debugPrint('[AuthController] Login already in progress, skipping duplicate call.');
-      return;
-    }
+    if (isLoading.value) return;
 
     try {
       isLoading.value = true;
+
       // 1) Laravel backend login
       final laravelResponse = await _authService.loginWithLaravel(email, password);
-      debugPrint('[AuthController] Laravel response: $laravelResponse');
 
       // Extract user data safely
       final userData = laravelResponse['user'];
@@ -216,15 +216,12 @@ class AuthController extends GetxController {
       }
 
       final userRole = userData['role']?.toString().toLowerCase() ?? '';
-      debugPrint('[AuthController] User role: $userRole');
-
       if (userRole.isEmpty) {
         throw 'Missing role from Laravel response';
       }
 
       // 2) Firebase login
       await _authService.loginWithFirebase(email, password);
-      debugPrint('[AuthController] Firebase login success');
 
       // 3) Save user data locally
       await _storageService.saveUserData(
@@ -235,18 +232,23 @@ class AuthController extends GetxController {
         email: userData['email']?.toString() ?? email,
       );
 
-      // 4) Check profile existence (backend)
-      final profileExists = await _checkProfileAfterLogin(laravelResponse['access_token'], userRole);
+      // 4) Check profile existence
+      final profileExists = await _checkProfileAfterLogin(
+          laravelResponse['access_token'],
+          userRole
+      );
 
+      // 5) Update state and storage
       hasProfile.value = profileExists;
+      isLoggedIn.value = true;
+      role.value = userRole;
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('hasProfile', profileExists);
 
-      // 5) update state & navigate
-      isLoggedIn.value = true;
-      role.value = userRole;
+      // 6) Navigate
       navigateBasedOnRole();
+
     } catch (e, st) {
       debugPrint('[AuthController] Login error: $e\n$st');
       rethrow;
@@ -268,6 +270,9 @@ class AuthController extends GetxController {
         case 'cleaner':
           endpoint = '$baseUrl/api/cleaner/profile/check';
           break;
+        case 'user':
+          endpoint = '$baseUrl/api/user/profile/check';
+          break;
         default:
           return false;
       }
@@ -283,19 +288,19 @@ class AuthController extends GetxController {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return data['success'] == true && (data['data']?['exists'] ?? data['exists'] ?? false);
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthenticated');
       }
       return false;
     } catch (e) {
-      debugPrint('[AuthController] Error checking profile after login: $e');
-      return false;
+      debugPrint('[AuthController] Error checking profile: $e');
+      rethrow;
     }
   }
 
   void navigateBasedOnRole() {
     final currentRole = role.value.toLowerCase();
-    String route = AppRoutes.LOGIN;
-
-    debugPrint('[AuthController] navigateBasedOnRole role=$currentRole hasProfile=${hasProfile.value}');
+    String route;
 
     switch (currentRole) {
       case 'plumber':
@@ -323,17 +328,14 @@ class AuthController extends GetxController {
       isLoading.value = true;
       await _authService.logout();
       await _storageService.clearAll();
+
       isLoggedIn.value = false;
       role.value = '';
       hasProfile.value = false;
+      bearerToken.value = '';
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('hasProfile', false);
-      await prefs.setString('role', '');
-      await prefs.setString('bearer_token', '');
-      await prefs.setString('email', '');
-      await prefs.setString('user_id', '');
-      await prefs.setString('name', '');
+      await _clearStoredData(prefs);
 
       Get.offAllNamed(AppRoutes.LOGIN);
     } catch (e) {
@@ -341,6 +343,41 @@ class AuthController extends GetxController {
       rethrow;
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> refreshToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final currentToken = prefs.getString('bearer_token');
+
+      if (currentToken == null) {
+        throw Exception('No token to refresh');
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/refresh'),
+        headers: {
+          'Authorization': 'Bearer $currentToken',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 12));
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        final newToken = responseData['access_token'];
+
+        await prefs.setString('bearer_token', newToken);
+        bearerToken.value = newToken;
+
+        debugPrint('[AuthController] Token refreshed successfully');
+      } else {
+        throw Exception('Token refresh failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('[AuthController] Token refresh error: $e');
+      await logout();
+      rethrow;
     }
   }
 }

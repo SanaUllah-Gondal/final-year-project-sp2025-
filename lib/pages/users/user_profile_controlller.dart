@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -34,8 +35,7 @@ class UserProfileController extends GetxController {
   final TextEditingController locationController = TextEditingController();
   final TextEditingController contactController = TextEditingController();
   final TextEditingController roleController = TextEditingController();
-
-  // State variables
+  final email = FirebaseAuth.instance.currentUser?.email;
   final Rx<File?> profileImage = Rx<File?>(null);
   final RxString bearerToken = ''.obs;
   final Rx<UserLocation?> userLocation = Rx<UserLocation?>(null);
@@ -93,12 +93,11 @@ class UserProfileController extends GetxController {
   // ==========================
   // 🔹 Centralized HTTP Helper
   // ==========================
-  Future<http.Response> _authenticatedRequest(
-      String url, {
-        String method = 'GET',
-        Map<String, dynamic>? body,
-        List<http.MultipartFile>? files,
-      }) async {
+  Future<http.Response> _authenticatedRequest(String url, {
+    String method = 'GET',
+    Map<String, dynamic>? body,
+    List<http.MultipartFile>? files,
+  }) async {
     try {
       final headers = {
         'Authorization': 'Bearer ${bearerToken.value}',
@@ -192,8 +191,10 @@ class UserProfileController extends GetxController {
 
         if (data['coordinates'] != null) {
           userLocation.value = UserLocation(
-            latitude: (data['coordinates']['latitude'] as num?)?.toDouble() ?? 0.0,
-            longitude: (data['coordinates']['longitude'] as num?)?.toDouble() ?? 0.0,
+            latitude: (data['coordinates']['latitude'] as num?)?.toDouble() ??
+                0.0,
+            longitude: (data['coordinates']['longitude'] as num?)?.toDouble() ??
+                0.0,
             address: data['coordinates']['address'] ?? '',
           );
         }
@@ -260,8 +261,8 @@ class UserProfileController extends GetxController {
       // Show success message
       successMessage.value = "Location updated successfully!";
 
-      _logDebug('Location obtained: Lat: ${position.latitude}, Lng: ${position.longitude}, Address: $address');
-
+      _logDebug('Location obtained: Lat: ${position.latitude}, Lng: ${position
+          .longitude}, Address: $address');
     } on TimeoutException {
       errorMessage.value = "Location request timed out. Please try again.";
     } catch (e) {
@@ -327,7 +328,8 @@ class UserProfileController extends GetxController {
 
       final files = <http.MultipartFile>[];
       if (profileImage.value != null) {
-        final mimeType = lookupMimeType(profileImage.value!.path) ?? 'image/jpeg';
+        final mimeType = lookupMimeType(profileImage.value!.path) ??
+            'image/jpeg';
         files.add(await http.MultipartFile.fromPath(
           'user_image',
           profileImage.value!.path,
@@ -348,7 +350,9 @@ class UserProfileController extends GetxController {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseData = json.decode(response.body);
         successMessage.value = responseData['message'] ??
-            (isUpdate ? 'Profile updated successfully' : 'Profile created successfully');
+            (isUpdate
+                ? 'Profile updated successfully'
+                : 'Profile created successfully');
 
         profileExists.value = true;
 
@@ -362,7 +366,6 @@ class UserProfileController extends GetxController {
 
         // Navigate to dashboard
         Get.offAllNamed(AppRoutes.HOME);
-
       } else if (response.statusCode == 422) {
         // Handle validation errors
         final errorData = json.decode(response.body);
@@ -377,7 +380,8 @@ class UserProfileController extends GetxController {
         throw Exception(errorMessages.join('\n'));
       } else {
         final errorData = json.decode(response.body);
-        final errorMsg = errorData['message'] ?? 'Failed with status ${response.statusCode}';
+        final errorMsg = errorData['message'] ??
+            'Failed with status ${response.statusCode}';
         throw Exception(errorMsg);
       }
     } catch (e) {
@@ -453,6 +457,52 @@ class UserProfileController extends GetxController {
     } catch (e) {
       bearerToken.value = '';
       throw Exception('Token refresh error: $e');
+    }
+  }
+
+  Future<void> saveProfileToCloud() async {
+    try {
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Convert image to base64 string if exists
+      String? imageBase64;
+      if (profileImage.value != null) {
+        final imageBytes = await profileImage.value!.readAsBytes();
+        imageBase64 = base64Encode(imageBytes);
+      }
+
+      // Prepare cleaner data
+      final userData = {
+        'userId': user.uid,
+        'fullName': nameController.text.trim(),
+        'email': email?.trim(),
+        'contactNumber': contactController.text.trim(),
+        'profileImage': imageBase64, // Base64 encoded image string
+        'location': userLocation.value != null ? {
+          'latitude': userLocation.value!.latitude,
+          'longitude': userLocation.value!.longitude,
+          'address': userLocation.value!.address,
+        } : null,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'role': 'user',
+      };
+
+      // Save to Firestore
+      await firestore
+          .collection('user')
+          .doc(user.uid)
+          .set(userData, SetOptions(merge: true));
+
+      _logDebug('useU profile saved to cloud successfully');
+    } catch (e) {
+      _logDebug('Error saving to cloud: $e');
+      throw Exception('Failed to save profile to cloud: $e');
     }
   }
 }

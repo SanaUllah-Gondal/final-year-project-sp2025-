@@ -19,6 +19,9 @@ class ElectricianDashboardController extends GetxController {
   var isLocationLoading = false.obs;
   var errorMessage = ''.obs;
   var userId = 0.obs;
+  var userEmail = ''.obs;
+  var phoneNumber = ''.obs; // Added phone number
+  var profileImage = ''.obs; // Added profile image
   var providerStats = <String, dynamic>{}.obs;
   var availableJobs = [].obs;
 
@@ -29,7 +32,9 @@ class ElectricianDashboardController extends GetxController {
     address: 'Location not available',
   ).obs;
 
-  var currentLocation = 'Location not available'.obs;
+  var currentAddressName = 'Location not available'.obs;
+  var currentLatitude = 0.0.obs;
+  var currentLongitude = 0.0.obs;
 
   // Location stream
   StreamSubscription<Position>? _positionStreamSubscription;
@@ -50,25 +55,44 @@ class ElectricianDashboardController extends GetxController {
   // Initialize controller
   Future<void> _initializeController() async {
     try {
-      await _loadUserId();
+      await _loadUserData();
       await _loadInitialStatus();
     } catch (e) {
       debugPrint('Error initializing controller: $e');
     }
   }
 
-  // Load user ID from storage
-  Future<void> _loadUserId() async {
+  // Load user ID, email, phone, and image from storage
+  Future<void> _loadUserData() async {
     try {
       final storedUserId = await _storageService.getUserId();
+      final storedUserEmail = await _storageService.getEmail();
+      final storedPhoneNumber = await _storageService.getPhoneNumber();
+      final storedProfileImage = await _storageService.getProfileImage();
+
       if (storedUserId != null) {
         userId.value = storedUserId;
         debugPrint('Electrician User ID from storage: ${userId.value}');
       } else {
         throw Exception('User ID not found in storage');
       }
+
+      if (storedUserEmail != null) {
+        userEmail.value = storedUserEmail;
+        debugPrint('User email from storage: ${userEmail.value}');
+      }
+
+      if (storedPhoneNumber != null) {
+        phoneNumber.value = storedPhoneNumber;
+        debugPrint('Phone number from storage: ${phoneNumber.value}');
+      }
+
+      if (storedProfileImage != null) {
+        profileImage.value = storedProfileImage;
+        debugPrint('Profile image from storage: ${profileImage.value}');
+      }
     } catch (e) {
-      debugPrint('Error loading user ID: $e');
+      debugPrint('Error loading user data: $e');
       rethrow;
     }
   }
@@ -109,28 +133,29 @@ class ElectricianDashboardController extends GetxController {
         position.longitude,
       ).timeout(const Duration(seconds: 10));
 
-      // Format address
-      String address = placemarks.isNotEmpty
-          ? [
-        placemarks.first.street ?? '',
-        placemarks.first.subLocality ?? '',
-        placemarks.first.locality ?? '',
-        placemarks.first.administrativeArea ?? '',
-      ].where((part) => part.isNotEmpty).join(', ')
-          : 'Unknown Location';
+      // Format address name
+      String addressName = placemarks.isNotEmpty
+          ? _formatAddressName(placemarks.first)
+          : 'Current Location';
 
       // Update location values
       userLocation.value = UserLocation(
         latitude: position.latitude,
         longitude: position.longitude,
-        address: address,
+        address: addressName,
       );
 
-      currentLocation.value = address;
+      currentAddressName.value = addressName;
+      currentLatitude.value = position.latitude;
+      currentLongitude.value = position.longitude;
 
       // If online, automatically update location on server
       if (isOnline.value) {
-        await _updateLocationOnServer(address, position.latitude, position.longitude);
+        await _updateLocationOnServer(
+            addressName,
+            position.latitude,
+            position.longitude
+        );
       }
 
     } catch (e) {
@@ -145,6 +170,18 @@ class ElectricianDashboardController extends GetxController {
     } finally {
       isLocationLoading.value = false;
     }
+  }
+
+  // Format address name from placemark
+  String _formatAddressName(Placemark placemark) {
+    final parts = [
+      placemark.street,
+      placemark.subLocality,
+      placemark.locality,
+      placemark.administrativeArea,
+    ].where((part) => part != null && part!.isNotEmpty).toList();
+
+    return parts.isNotEmpty ? parts.join(', ') : 'Current Location';
   }
 
   // Start continuous location tracking
@@ -167,25 +204,27 @@ class ElectricianDashboardController extends GetxController {
             position.longitude,
           );
 
-          String address = placemarks.isNotEmpty
-              ? [
-            placemarks.first.street ?? '',
-            placemarks.first.subLocality ?? '',
-            placemarks.first.locality ?? '',
-          ].where((part) => part.isNotEmpty).join(', ')
+          String addressName = placemarks.isNotEmpty
+              ? _formatAddressName(placemarks.first)
               : 'Tracking...';
 
           userLocation.value = UserLocation(
             latitude: position.latitude,
             longitude: position.longitude,
-            address: address,
+            address: addressName,
           );
 
-          currentLocation.value = address;
+          currentAddressName.value = addressName;
+          currentLatitude.value = position.latitude;
+          currentLongitude.value = position.longitude;
 
           // Update server if online
           if (isOnline.value) {
-            await _updateLocationOnServer(address, position.latitude, position.longitude);
+            await _updateLocationOnServer(
+                addressName,
+                position.latitude,
+                position.longitude
+            );
           }
         } catch (e) {
           debugPrint('Error in location stream: $e');
@@ -206,11 +245,11 @@ class ElectricianDashboardController extends GetxController {
   }
 
   // Update location on server
-  Future<void> _updateLocationOnServer(String address, double latitude, double longitude) async {
+  Future<void> _updateLocationOnServer(String addressName, double latitude, double longitude) async {
     try {
       await _apiService.updateProviderLocation(
         providerType: 'electrician',
-        location: address,
+        addressName: addressName,
         latitude: latitude,
         longitude: longitude,
       );
@@ -238,7 +277,9 @@ class ElectricianDashboardController extends GetxController {
       final response = await _apiService.toggleOnlineStatus(
         providerType: 'electrician',
         isOnline: !isOnline.value,
-        location: currentLocation.value,
+        addressName: currentAddressName.value,
+        latitude: currentLatitude.value,
+        longitude: currentLongitude.value,
       );
 
       if (response['success']) {
@@ -308,7 +349,7 @@ class ElectricianDashboardController extends GetxController {
     }
   }
 
-  // Load initial status from API
+  // Load initial status from API - UPDATED to handle phone and image
   Future<void> _loadInitialStatus() async {
     try {
       isLoading.value = true;
@@ -328,7 +369,26 @@ class ElectricianDashboardController extends GetxController {
         final providerData = response['data'];
         isOnline.value = providerData['is_online'] ?? false;
         isWorking.value = providerData['is_working'] ?? false;
-        currentLocation.value = providerData['current_location'] ?? 'Location not available';
+        currentAddressName.value = providerData['address_name'] ?? 'Location not available';
+        currentLatitude.value = providerData['latitude']?.toDouble() ?? 0.0;
+        currentLongitude.value = providerData['longitude']?.toDouble() ?? 0.0;
+
+        // Update phone and image from status if available
+        if (providerData['phone_number'] != null) {
+          phoneNumber.value = providerData['phone_number'];
+          await _storageService.savePhoneNumber(phoneNumber.value);
+        }
+        if (providerData['profile_image'] != null) {
+          profileImage.value = providerData['profile_image'];
+          await _storageService.saveProfileImage(profileImage.value);
+        }
+
+        // Update user location object
+        userLocation.value = UserLocation(
+          latitude: currentLatitude.value,
+          longitude: currentLongitude.value,
+          address: currentAddressName.value,
+        );
 
         // Start tracking if already online
         if (isOnline.value) {
@@ -342,7 +402,7 @@ class ElectricianDashboardController extends GetxController {
     }
   }
 
-  // Get available jobs
+  // Get available jobs - UPDATED to handle phone and image in providers
   Future<void> loadAvailableJobs() async {
     try {
       isLoading.value = true;
@@ -350,6 +410,12 @@ class ElectricianDashboardController extends GetxController {
 
       if (response['success']) {
         availableJobs.value = response['providers'] ?? [];
+        debugPrint('Available jobs loaded: ${availableJobs.length}');
+
+        // Log the first provider to verify phone and image data
+        if (availableJobs.isNotEmpty) {
+          debugPrint('First provider data: ${jsonEncode(availableJobs.first)}');
+        }
       }
     } catch (e) {
       debugPrint('Error loading available jobs: $e');
@@ -369,7 +435,12 @@ class ElectricianDashboardController extends GetxController {
   bool get getIsOnline => isOnline.value;
   bool get getIsWorking => isWorking.value;
   int get getUserId => userId.value;
-  String get getCurrentLocation => currentLocation.value;
+  String get getEmail => userEmail.value;
+  String get getPhoneNumber => phoneNumber.value;
+  String get getProfileImage => profileImage.value;
+  String get getCurrentAddressName => currentAddressName.value;
+  double get getCurrentLatitude => currentLatitude.value;
+  double get getCurrentLongitude => currentLongitude.value;
   bool get getIsLoading => isLoading.value;
   bool get getIsLocationLoading => isLocationLoading.value;
   Map<String, dynamic> get getProviderStats => providerStats.value;

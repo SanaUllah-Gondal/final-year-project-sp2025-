@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -352,6 +353,11 @@ class CleanerProfileController extends GetxController {
         final responseData = json.decode(response.body);
         successMessage.value = responseData['message'] ??
             (isUpdate ? 'Profile updated successfully' : 'Profile created successfully');
+       try {
+         await saveCleanerProfileToCloud;
+       }catch (e) {
+         _logDebug('Firebase backup failed: $e');
+       }
         Get.toNamed(AppRoutes.CLEANER_DASHBOARD);
         final authController = Get.find<AuthController>();
         authController.hasProfile.value = true;
@@ -479,7 +485,58 @@ class CleanerProfileController extends GetxController {
       throw Exception('Token refresh error: $e');
     }
   }
+  Future<void> saveCleanerProfileToCloud() async {
+    try {
+      // Get Firestore instance
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
+      // Get current user ID
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Convert image to base64 string if exists
+      String? imageBase64;
+      if (profileImage.value != null) {
+        final imageBytes = await profileImage.value!.readAsBytes();
+        imageBase64 = base64Encode(imageBytes);
+      }
+
+      // Prepare cleaner data
+      final cleanerData = {
+        'userId': user.uid,
+        'fullName': nameController.text.trim(),
+        'email': emailController.text.trim(),
+        'experience': experienceController.text.trim(),
+        'skills': skillsController.text.trim(),
+        'serviceArea': areaController.text.trim(),
+        'hourlyRate': double.tryParse(rateController.text.trim()) ?? 0.0,
+        'contactNumber': contactController.text.trim(),
+        'profileImage': imageBase64, // Base64 encoded image string
+        'location': userLocation.value != null ? {
+          'latitude': userLocation.value!.latitude,
+          'longitude': userLocation.value!.longitude,
+          'address': userLocation.value!.address,
+        } : null,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'role': 'cleaner',
+      };
+
+      // Save to Firestore
+      await firestore
+          .collection('cleaner')
+          .doc(user.uid)
+          .set(cleanerData, SetOptions(merge: true));
+
+      _logDebug('Cleaner profile saved to Firebase successfully');
+
+    } catch (e) {
+      _logDebug('Error saving to Firebase: $e');
+      throw Exception('Failed to save profile to Firebase: $e');
+    }
+  }
   Future<String> _getToken() async {
     if (bearerToken.isNotEmpty) return bearerToken.value;
     final prefs = await SharedPreferences.getInstance();
