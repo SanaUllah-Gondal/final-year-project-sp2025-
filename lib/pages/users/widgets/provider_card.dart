@@ -8,6 +8,7 @@ class ProviderCard extends StatelessWidget {
   final bool isSelected;
   final Function(LatLng) onNavigate;
   final Function() onTap;
+  final double? hourlyRate;
 
   const ProviderCard({
     Key? key,
@@ -15,6 +16,7 @@ class ProviderCard extends StatelessWidget {
     required this.isSelected,
     required this.onNavigate,
     required this.onTap,
+    this.hourlyRate
   }) : super(key: key);
 
   @override
@@ -24,6 +26,7 @@ class ProviderCard extends StatelessWidget {
     final String email = provider['email']?.toString() ?? 'No email';
     final String addressName = provider['address_name']?.toString() ?? 'Location not specified';
     final Color providerColor = getColorForProviderType(providerType);
+    final String hourlyrate1=hourlyRate.toString();
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -55,6 +58,7 @@ class ProviderCard extends StatelessWidget {
               ),
             ),
             Text('Experience: ${experience.toStringAsFixed(0)} years'),
+            Text('Hourly rate: $hourlyrate1'),
             Text('Email: $email'),
             Text(
               addressName,

@@ -11,6 +11,7 @@ class ProviderDetailsSheet extends StatefulWidget {
   final VoidCallback onBookAppointment;
   final Color primaryColor;
   final Color secondaryColor;
+  final double? hourlyRate;
 
   const ProviderDetailsSheet({
     Key? key,
@@ -19,6 +20,7 @@ class ProviderDetailsSheet extends StatefulWidget {
     required this.onBookAppointment,
     this.primaryColor = Colors.blue,
     this.secondaryColor = Colors.teal,
+    this.hourlyRate
   }) : super(key: key);
 
   @override
@@ -56,13 +58,13 @@ class _ProviderDetailsSheetState extends State<ProviderDetailsSheet> {
           collectionName = 'plumbers';
           break;
         case 'electrician':
-          collectionName = 'electricians';
+          collectionName = 'electrician';
           break;
         case 'cleaner':
-          collectionName = 'cleaners';
+          collectionName = 'cleaner';
           break;
         default:
-          collectionName = 'providers'; // fallback collection
+          collectionName = 'provider'; // fallback collection
       }
 
       final querySnapshot = await FirebaseFirestore.instance

@@ -287,11 +287,37 @@ class AuthController extends GetxController {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return data['success'] == true && (data['data']?['exists'] ?? data['exists'] ?? false);
+
+        // Debug the response structure
+        debugPrint('[AuthController] Profile check response: $data');
+
+        // Handle different response structures
+        if (data['success'] == true) {
+          // Case 1: Data contains 'exists' field
+          if (data['data'] != null && data['data'] is Map) {
+            return data['data']['exists'] == true;
+          }
+          // Case 2: Direct 'exists' field in root
+          else if (data['exists'] != null) {
+            return data['exists'] == true;
+          }
+          // Case 3: Profile data is returned directly
+          else if (data['data'] != null && data['data'] is Map && data['data'].isNotEmpty) {
+            return true;
+          }
+          // Case 4: Success true but no explicit exists field
+          else {
+            return data['success'] == true;
+          }
+        }
+
+        return false;
       } else if (response.statusCode == 401) {
         throw Exception('Unauthenticated');
+      } else {
+        debugPrint('[AuthController] Profile check failed: ${response.statusCode}');
+        return false;
       }
-      return false;
     } catch (e) {
       debugPrint('[AuthController] Error checking profile: $e');
       rethrow;

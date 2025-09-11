@@ -354,7 +354,7 @@ class CleanerProfileController extends GetxController {
         successMessage.value = responseData['message'] ??
             (isUpdate ? 'Profile updated successfully' : 'Profile created successfully');
        try {
-         await saveCleanerProfileToCloud;
+         await saveCleanerProfileToCloud();
        }catch (e) {
          _logDebug('Firebase backup failed: $e');
        }

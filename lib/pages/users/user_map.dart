@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:plumber_project/pages/users/widgets/appointment_booking_screen.dart';
 import 'package:plumber_project/pages/users/widgets/map_utils.dart';
 import 'package:plumber_project/pages/users/widgets/provider_card.dart';
@@ -27,7 +29,9 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final Completer<GoogleMapController> _controller = Completer();
   final Set<Marker> _markers = {};
+  final Map<String, double> _providerPrices = {}; // Store provider prices by ID
   String? _selectedProviderId;
+  double? _basePrice;
   bool _showProvidersList = false;
   LatLngBounds? _mapBounds;
   Map<String, dynamic>? _selectedProvider;
@@ -37,12 +41,107 @@ class _MapScreenState extends State<MapScreen> {
   BitmapDescriptor? _electricianIcon;
   BitmapDescriptor? _userIcon;
   BitmapDescriptor? _selectedIcon;
+  bool _isLoadingPrices = false;
 
   @override
   void initState() {
     super.initState();
     _initMarkers();
     _loadCustomIcons();
+    _loadProviderPrices();
+  }
+
+  Future<void> _loadProviderPrices() async {
+    setState(() {
+      _isLoadingPrices = true;
+    });
+
+    try {
+      for (var provider in widget.providers) {
+        final providerId = provider['provider_id']?.toString() ?? provider['id']?.toString();
+        final providerType = provider['provider_type']?.toString().toLowerCase() ?? widget.serviceType.toLowerCase();
+        final email = provider['email']?.toString();
+
+        if (providerId != null && email != null && email.isNotEmpty) {
+          final price = await _getHourlyRateFromFirebase(providerType, email);
+          if (price != null) {
+            _providerPrices[providerId] = price;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading provider prices: $e");
+    } finally {
+      setState(() {
+        _isLoadingPrices = false;
+      });
+    }
+  }
+
+  Future<double?> _getHourlyRateFromFirebase(String providerType, String email) async {
+    try {
+      // Determine the collection name based on provider type
+      String collectionName;
+      switch (providerType.toLowerCase()) {
+        case 'plumber':
+          collectionName = 'plumbers';
+          break;
+        case 'electrician':
+          collectionName = 'electrician';
+          break;
+        case 'cleaner':
+          collectionName = 'cleaner';
+          break;
+        default:
+          collectionName = 'provider'; // fallback collection
+      }
+      print('name=============$collectionName');
+
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection(collectionName)
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        final doc = querySnapshot.docs.first;
+        final data = doc.data();
+
+        // Get hourly rate from Firebase
+        if (data.containsKey('hourly_rate')) {
+          final hourlyRate = data['hourly_rate'];
+          print('hr=====================$hourlyRate');
+          if (hourlyRate is double) {
+            return hourlyRate;
+          } else if (hourlyRate is int) {
+            return hourlyRate.toDouble();
+          } else if (hourlyRate is String) {
+            return double.tryParse(hourlyRate);
+          }
+        }
+
+        // Fallback to default rates based on provider type
+        return _getDefaultHourlyRate(providerType);
+      }
+    } catch (e) {
+      debugPrint('Error fetching hourly rate from Firebase: $e');
+    }
+
+    // Return default rate if Firebase fetch fails
+    return _getDefaultHourlyRate(providerType);
+  }
+
+  double _getDefaultHourlyRate(String providerType) {
+    switch (providerType.toLowerCase()) {
+      case 'plumber':
+        return 50.0;
+      case 'electrician':
+        return 60.0;
+      case 'cleaner':
+        return 35.0;
+      default:
+        return 45.0;
+    }
   }
 
   Future<void> _loadCustomIcons() async {
@@ -155,9 +254,13 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _showProviderDetails(Map<String, dynamic> provider) {
+    final providerId = provider['provider_id']?.toString() ?? provider['id']?.toString();
+    final hourlyRate = providerId != null ? _providerPrices[providerId] : null;
+
     setState(() {
-      _selectedProviderId = provider['provider_id']?.toString() ?? provider['id']?.toString();
+      _selectedProviderId = providerId;
       _selectedProvider = provider;
+      _basePrice = hourlyRate;
     });
 
     showModalBottomSheet(
@@ -167,6 +270,7 @@ class _MapScreenState extends State<MapScreen> {
         provider: provider,
         serviceType: widget.serviceType,
         onBookAppointment: _navigateToAppointmentScreen,
+        hourlyRate: hourlyRate,
       ),
     );
   }
@@ -174,12 +278,16 @@ class _MapScreenState extends State<MapScreen> {
   void _navigateToAppointmentScreen() {
     if (_selectedProvider == null) return;
 
+    final providerId = _selectedProvider!['provider_id']?.toString() ?? _selectedProvider!['id']?.toString();
+    final hourlyRate = providerId != null ? _providerPrices[providerId] : _getDefaultHourlyRate(widget.serviceType);
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => AppointmentBookingScreen(
           provider: _selectedProvider!,
           serviceType: widget.serviceType,
           userLocation: widget.userLocation,
+          basePrice: hourlyRate ?? _getDefaultHourlyRate(widget.serviceType),
         ),
       ),
     );
@@ -257,22 +365,30 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ),
               ),
+              if (_isLoadingPrices)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ),
               Expanded(
                 child: ListView.builder(
                   controller: scrollController,
                   itemCount: widget.providers.length,
                   itemBuilder: (context, index) {
                     final provider = widget.providers[index];
-                    final isSelected = _selectedProviderId ==
-                        (provider['provider_id']?.toString() ?? provider['id']?.toString());
+                    final providerId = provider['provider_id']?.toString() ?? provider['id']?.toString();
+                    final hourlyRate = providerId != null ? _providerPrices[providerId] : null;
+                    final isSelected = _selectedProviderId == providerId;
+
                     return ProviderCard(
                       provider: provider,
+                      hourlyRate: hourlyRate,
                       isSelected: isSelected,
                       onNavigate: (LatLng position) async {
                         final controller = await _controller.future;
                         await controller.animateCamera(CameraUpdate.newLatLng(position));
                         setState(() {
-                          _selectedProviderId = provider['provider_id']?.toString() ?? provider['id']?.toString();
+                          _selectedProviderId = providerId;
                         });
                       },
                       onTap: () async {
@@ -283,7 +399,7 @@ class _MapScreenState extends State<MapScreen> {
                         final controller = await _controller.future;
                         await controller.animateCamera(CameraUpdate.newLatLngZoom(providerPosition, 15));
                         setState(() {
-                          _selectedProviderId = provider['provider_id']?.toString() ?? provider['id']?.toString();
+                          _selectedProviderId = providerId;
                         });
                       },
                     );
