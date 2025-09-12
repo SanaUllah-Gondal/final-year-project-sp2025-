@@ -297,11 +297,7 @@ class AuthController extends GetxController {
           if (data['data'] != null && data['data'] is Map) {
             return data['data']['exists'] == true;
           }
-          // Case 2: Direct 'exists' field in root
-          else if (data['exists'] != null) {
-            return data['exists'] == true;
-          }
-          // Case 3: Profile data is returned directly
+
           else if (data['data'] != null && data['data'] is Map && data['data'].isNotEmpty) {
             return true;
           }

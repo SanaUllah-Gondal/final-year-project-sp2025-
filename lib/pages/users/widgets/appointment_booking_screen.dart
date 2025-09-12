@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:http_parser/http_parser.dart';
+import 'package:path/path.dart' as path;
+import '../../Apis.dart';
 import '../services/appointment_service.dart';
 import 'map_utils.dart';
-
 
 class AppointmentBookingScreen extends StatefulWidget {
   final Map<String, dynamic> provider;
@@ -77,17 +77,6 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
     });
   }
 
-  Future<String?> _convertImageToBase64(File imageFile) async {
-    try {
-      List<int> imageBytes = await imageFile.readAsBytes();
-      String base64Image = base64Encode(imageBytes);
-      return base64Image;
-    } catch (e) {
-      print('Error converting image to base64: $e');
-      return null;
-    }
-  }
-
   Future<void> _pickImage() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
@@ -126,68 +115,101 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
   }
 
   Future<void> _submitAppointment() async {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedDate == null || _selectedTime == null) {
-        _showErrorDialog('Please select both date and time');
-        return;
-      }
+    print("Submit Appointment tapped ✅");
 
-      setState(() {
-        _isLoading = true;
-      });
+    if (!_formKey.currentState!.validate()) {
+      print("Form validation failed ❌");
+      return;
+    }
 
-      try {
-        // Convert image to base64 if available
-        String? base64Image;
-        if (_problemImage != null) {
-          base64Image = await _convertImageToBase64(_problemImage!);
-        }
+    if (_selectedDate == null || _selectedTime == null) {
+      _showErrorDialog('Please select both date and time');
+      return;
+    }
 
-        // Combine date and time
-        final appointmentDateTime = DateTime(
-          _selectedDate!.year,
-          _selectedDate!.month,
-          _selectedDate!.day,
-          _selectedTime!.hour,
-          _selectedTime!.minute,
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final appointmentDateTime = DateTime(
+        _selectedDate!.year,
+        _selectedDate!.month,
+        _selectedDate!.day,
+        _selectedTime!.hour,
+        _selectedTime!.minute,
+      );
+
+      // Create multipart request
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/api/appointments/${widget.serviceType.toLowerCase()}'),
+      );
+
+      // Add headers
+      final token = await AppointmentService.getToken();
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Accept'] = 'application/json';
+
+      // Get provider ID and ensure it's a string
+      final providerId = widget.provider['provider_id'] ?? widget.provider['id'];
+      final providerIdString = providerId.toString(); // Convert to string
+
+      // Add form data - ensure all values are strings
+      request.fields['provider_id'] = providerIdString;
+      request.fields['appointment_type'] = _appointmentType!;
+      request.fields['sub_service_type'] = _selectedServiceType!;
+      request.fields['description'] = _descriptionController.text;
+      request.fields['appointment_date'] = appointmentDateTime.toIso8601String();
+      request.fields['address'] = _addressController.text;
+      request.fields['base_price'] = widget.basePrice.toString();
+      request.fields['latitude'] = widget.userLocation.latitude.toString();
+      request.fields['longitude'] = widget.userLocation.longitude.toString();
+
+      print("📤 Sending appointment data:");
+      print("Provider ID: $providerIdString");
+      print("Appointment Type: ${_appointmentType!}");
+      print("Sub Service Type: ${_selectedServiceType!}");
+      print("Base Price: ${widget.basePrice}");
+
+      // Add image file if selected
+      if (_problemImage != null) {
+        var fileStream = http.ByteStream(_problemImage!.openRead());
+        var length = await _problemImage!.length();
+
+        var multipartFile = http.MultipartFile(
+          'problem_image',
+          fileStream,
+          length,
+          filename: path.basename(_problemImage!.path),
+          contentType: MediaType('image', 'jpeg'),
         );
 
-        Map<String, dynamic> appointmentData = {
-          'provider_id': widget.provider['provider_id'] ?? widget.provider['id'],
-          'service_type': widget.serviceType.toLowerCase(),
-          'appointment_type': _appointmentType,
-          'sub_service_type': _selectedServiceType,
-          'description': _descriptionController.text,
-          'appointment_date': appointmentDateTime.toIso8601String(),
-          'address': _addressController.text,
-          'base_price': widget.basePrice,  // ← This is what backend expects
-          'latitude': widget.userLocation.latitude,
-          'longitude': widget.userLocation.longitude,
-        };
-
-
-        if (base64Image != null) {
-          appointmentData['problem_image'] = base64Image;
-        }
-
-        print('Sending appointment data: $appointmentData');
-
-        // Use the AppointmentService
-        final result = await AppointmentService.createAppointment(appointmentData);
-
-        if (result['success']) {
-          _showConfirmationDialog();
-        } else {
-          _showErrorDialog(result['message'] ?? 'Failed to book appointment');
-        }
-      } catch (e) {
-        print('Error in _submitAppointment: $e');
-        _showErrorDialog('An error occurred: $e');
-      } finally {
-        setState(() {
-          _isLoading = false;
-        });
+        request.files.add(multipartFile);
+        print("📷 Image attached: ${_problemImage!.path}");
       }
+
+      // Send request
+      var response = await request.send();
+      var responseData = await response.stream.bytesToString();
+
+      print("📥 Response status: ${response.statusCode}");
+      print("📥 Response body: $responseData");
+
+      var result = json.decode(responseData);
+
+      if (response.statusCode == 201) {
+        _showConfirmationDialog();
+      } else {
+        _showErrorDialog(result['message'] ?? 'Failed to create appointment. Status: ${response.statusCode}');
+      }
+    } catch (e) {
+      print("❌ Error in submit: $e");
+      _showErrorDialog("Error: ${e.toString()}");
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 

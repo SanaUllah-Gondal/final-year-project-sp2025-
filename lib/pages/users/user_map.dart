@@ -56,14 +56,17 @@ class _MapScreenState extends State<MapScreen> {
       _isLoadingPrices = true;
     });
 
+
+
     try {
       for (var provider in widget.providers) {
         final providerId = provider['provider_id']?.toString() ?? provider['id']?.toString();
-        final providerType = provider['provider_type']?.toString().toLowerCase() ?? widget.serviceType.toLowerCase();
         final email = provider['email']?.toString();
+        final providerType = provider['provider_type']?.toString().toLowerCase();
 
         if (providerId != null && email != null && email.isNotEmpty) {
-          final price = await _getHourlyRateFromFirebase(providerType, email);
+          final price = await _getHourlyRateFromCloud(email,providerType!);
+          print('price==========================================================$price');
           if (price != null) {
             _providerPrices[providerId] = price;
           }
@@ -78,9 +81,9 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  Future<double?> _getHourlyRateFromFirebase(String providerType, String email) async {
+  Future<double?> _getHourlyRateFromCloud(String email, String providerType) async {
     try {
-      // Determine the collection name based on provider type
+
       String collectionName;
       switch (providerType.toLowerCase()) {
         case 'plumber':
@@ -95,8 +98,8 @@ class _MapScreenState extends State<MapScreen> {
         default:
           collectionName = 'provider'; // fallback collection
       }
-      print('name=============$collectionName');
-
+      // Query the users collection by email
+      print('=====================================================$collectionName');
       final querySnapshot = await FirebaseFirestore.instance
           .collection(collectionName)
           .where('email', isEqualTo: email)
@@ -107,10 +110,9 @@ class _MapScreenState extends State<MapScreen> {
         final doc = querySnapshot.docs.first;
         final data = doc.data();
 
-        // Get hourly rate from Firebase
-        if (data.containsKey('hourly_rate')) {
-          final hourlyRate = data['hourly_rate'];
-          print('hr=====================$hourlyRate');
+        // Get hourly rate from user document
+        if (data.containsKey('hourlyRate')) {
+          final hourlyRate = data['hourlyRate'];
           if (hourlyRate is double) {
             return hourlyRate;
           } else if (hourlyRate is int) {
@@ -119,29 +121,13 @@ class _MapScreenState extends State<MapScreen> {
             return double.tryParse(hourlyRate);
           }
         }
-
-        // Fallback to default rates based on provider type
-        return _getDefaultHourlyRate(providerType);
       }
     } catch (e) {
-      debugPrint('Error fetching hourly rate from Firebase: $e');
+      debugPrint('Error fetching hourly rate: $e');
     }
 
-    // Return default rate if Firebase fetch fails
-    return _getDefaultHourlyRate(providerType);
-  }
-
-  double _getDefaultHourlyRate(String providerType) {
-    switch (providerType.toLowerCase()) {
-      case 'plumber':
-        return 50.0;
-      case 'electrician':
-        return 60.0;
-      case 'cleaner':
-        return 35.0;
-      default:
-        return 45.0;
-    }
+    // Return null if not found or error
+    return null;
   }
 
   Future<void> _loadCustomIcons() async {
@@ -291,6 +277,19 @@ class _MapScreenState extends State<MapScreen> {
         ),
       ),
     );
+  }
+
+  double _getDefaultHourlyRate(String providerType) {
+    switch (providerType.toLowerCase()) {
+      case 'plumber':
+        return 50.0;
+      case 'electrician':
+        return 60.0;
+      case 'cleaner':
+        return 35.0;
+      default:
+        return 45.0;
+    }
   }
 
   Future<void> _changeMapMode(MapMode mode) async {
