@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
@@ -20,10 +19,13 @@ class ElectricianDashboardController extends GetxController {
   var errorMessage = ''.obs;
   var userId = 0.obs;
   var userEmail = ''.obs;
-  var phoneNumber = ''.obs; // Added phone number
-  var profileImage = ''.obs; // Added profile image
+  var phoneNumber = ''.obs;
+  var profileImage = ''.obs;
   var providerStats = <String, dynamic>{}.obs;
   var availableJobs = [].obs;
+  var hasPendingRequests = false.obs;
+  var appointments = [].obs;
+  var pendingRequestCount = 0.obs;
 
   // Location variables
   var userLocation = UserLocation(
@@ -52,17 +54,41 @@ class ElectricianDashboardController extends GetxController {
     super.onClose();
   }
 
-  // Initialize controller
   Future<void> _initializeController() async {
     try {
       await _loadUserData();
       await _loadInitialStatus();
+      await loadAppointments();
     } catch (e) {
       debugPrint('Error initializing controller: $e');
     }
   }
 
-  // Load user ID, email, phone, and image from storage
+  void _checkPendingRequests() {
+    final pendingApps = appointments.where((appt) =>
+    appt['status'] == 'pending' &&
+        DateTime.parse(appt['appointment_date']).isAfter(DateTime.now()));
+
+    hasPendingRequests.value = pendingApps.isNotEmpty;
+    pendingRequestCount.value = pendingApps.length;
+  }
+
+  Future<void> loadAppointments() async {
+    try {
+      isLoading.value = true;
+      final response = await _apiService.getElectricianAppointments();
+
+      if (response['success']) {
+        appointments.value = response['data']?['data'] ?? [];
+        _checkPendingRequests();
+      }
+    } catch (e) {
+      debugPrint('Error loading appointments: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<void> _loadUserData() async {
     try {
       final storedUserId = await _storageService.getUserId();
@@ -70,46 +96,25 @@ class ElectricianDashboardController extends GetxController {
       final storedPhoneNumber = await _storageService.getPhoneNumber();
       final storedProfileImage = await _storageService.getProfileImage();
 
-      if (storedUserId != null) {
-        userId.value = storedUserId;
-        debugPrint('Electrician User ID from storage: ${userId.value}');
-      } else {
-        throw Exception('User ID not found in storage');
-      }
-
-      if (storedUserEmail != null) {
-        userEmail.value = storedUserEmail;
-        debugPrint('User email from storage: ${userEmail.value}');
-      }
-
-      if (storedPhoneNumber != null) {
-        phoneNumber.value = storedPhoneNumber;
-        debugPrint('Phone number from storage: ${phoneNumber.value}');
-      }
-
-      if (storedProfileImage != null) {
-        profileImage.value = storedProfileImage;
-        debugPrint('Profile image from storage: ${profileImage.value}');
-      }
+      userId.value = storedUserId ?? 0;
+      userEmail.value = storedUserEmail ?? '';
+      phoneNumber.value = storedPhoneNumber ?? '';
+      profileImage.value = storedProfileImage ?? '';
     } catch (e) {
       debugPrint('Error loading user data: $e');
-      rethrow;
     }
   }
 
-  // Get live current location with proper error handling
   Future<void> getLiveLocation() async {
     try {
       isLocationLoading.value = true;
       errorMessage.value = '';
 
-      // Check if location services are enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        throw Exception("Location services are disabled. Please enable them.");
+        throw Exception("Location services are disabled");
       }
 
-      // Check location permissions
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -122,23 +127,19 @@ class ElectricianDashboardController extends GetxController {
         throw Exception("Location permissions are permanently denied");
       }
 
-      // Get current position with timeout
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       ).timeout(const Duration(seconds: 15));
 
-      // Get address from coordinates
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
         position.longitude,
       ).timeout(const Duration(seconds: 10));
 
-      // Format address name
       String addressName = placemarks.isNotEmpty
           ? _formatAddressName(placemarks.first)
           : 'Current Location';
 
-      // Update location values
       userLocation.value = UserLocation(
         latitude: position.latitude,
         longitude: position.longitude,
@@ -149,7 +150,6 @@ class ElectricianDashboardController extends GetxController {
       currentLatitude.value = position.latitude;
       currentLongitude.value = position.longitude;
 
-      // If online, automatically update location on server
       if (isOnline.value) {
         await _updateLocationOnServer(
             addressName,
@@ -160,19 +160,11 @@ class ElectricianDashboardController extends GetxController {
 
     } catch (e) {
       errorMessage.value = "Error getting location: $e";
-      Get.snackbar(
-        'Location Error',
-        errorMessage.value,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
     } finally {
       isLocationLoading.value = false;
     }
   }
 
-  // Format address name from placemark
   String _formatAddressName(Placemark placemark) {
     final parts = [
       placemark.street,
@@ -184,13 +176,10 @@ class ElectricianDashboardController extends GetxController {
     return parts.isNotEmpty ? parts.join(', ') : 'Current Location';
   }
 
-  // Start continuous location tracking
   Future<void> startLocationTracking() async {
     try {
-      // First get initial location
       await getLiveLocation();
 
-      // Set up location stream for continuous updates
       _positionStreamSubscription = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -198,7 +187,6 @@ class ElectricianDashboardController extends GetxController {
         ),
       ).listen((Position position) async {
         try {
-          // Get address for new position
           List<Placemark> placemarks = await placemarkFromCoordinates(
             position.latitude,
             position.longitude,
@@ -218,7 +206,6 @@ class ElectricianDashboardController extends GetxController {
           currentLatitude.value = position.latitude;
           currentLongitude.value = position.longitude;
 
-          // Update server if online
           if (isOnline.value) {
             await _updateLocationOnServer(
                 addressName,
@@ -238,13 +225,11 @@ class ElectricianDashboardController extends GetxController {
     }
   }
 
-  // Stop location tracking
   void _stopLocationTracking() {
     _positionStreamSubscription?.cancel();
     isTrackingLocation.value = false;
   }
 
-  // Update location on server
   Future<void> _updateLocationOnServer(String addressName, double latitude, double longitude) async {
     try {
       await _apiService.updateProviderLocation(
@@ -258,19 +243,14 @@ class ElectricianDashboardController extends GetxController {
     }
   }
 
-  // Toggle online/offline status with live location
   Future<void> toggleOnlineStatus() async {
     try {
       isLoading.value = true;
 
-      // Get live location before going online
       if (!isOnline.value) {
         await getLiveLocation();
-
-        // Start tracking when going online
         await startLocationTracking();
       } else {
-        // Stop tracking when going offline
         _stopLocationTracking();
       }
 
@@ -296,7 +276,6 @@ class ElectricianDashboardController extends GetxController {
         );
       }
     } catch (e) {
-      // Revert UI state if API call fails
       if (!isOnline.value) {
         _stopLocationTracking();
       }
@@ -314,7 +293,6 @@ class ElectricianDashboardController extends GetxController {
     }
   }
 
-  // Update working status
   Future<void> updateWorkingStatus(bool working) async {
     try {
       isLoading.value = true;
@@ -349,21 +327,16 @@ class ElectricianDashboardController extends GetxController {
     }
   }
 
-  // Load initial status from API - UPDATED to handle phone and image
   Future<void> _loadInitialStatus() async {
     try {
       isLoading.value = true;
 
-      // First check if user has an electrician profile
       final profileResponse = await _apiService.getMyElectricianProfile();
-      debugPrint('Electrician Profile response: ${jsonEncode(profileResponse)}');
-
       if (!profileResponse['success']) {
-        throw Exception('No electrician profile found. Please create a profile first.');
+        throw Exception('No electrician profile found');
       }
 
       final response = await _apiService.getProviderStatus('electrician');
-      debugPrint('Electrician Provider status response: ${jsonEncode(response)}');
 
       if (response['success']) {
         final providerData = response['data'];
@@ -373,7 +346,6 @@ class ElectricianDashboardController extends GetxController {
         currentLatitude.value = providerData['latitude']?.toDouble() ?? 0.0;
         currentLongitude.value = providerData['longitude']?.toDouble() ?? 0.0;
 
-        // Update phone and image from status if available
         if (providerData['phone_number'] != null) {
           phoneNumber.value = providerData['phone_number'];
           await _storageService.savePhoneNumber(phoneNumber.value);
@@ -383,14 +355,12 @@ class ElectricianDashboardController extends GetxController {
           await _storageService.saveProfileImage(profileImage.value);
         }
 
-        // Update user location object
         userLocation.value = UserLocation(
           latitude: currentLatitude.value,
           longitude: currentLongitude.value,
           address: currentAddressName.value,
         );
 
-        // Start tracking if already online
         if (isOnline.value) {
           await startLocationTracking();
         }
@@ -402,50 +372,8 @@ class ElectricianDashboardController extends GetxController {
     }
   }
 
-  // Get available jobs - UPDATED to handle phone and image in providers
-  Future<void> loadAvailableJobs() async {
-    try {
-      isLoading.value = true;
-      final response = await _apiService.getAvailableProviders('electrician');
-
-      if (response['success']) {
-        availableJobs.value = response['providers'] ?? [];
-        debugPrint('Available jobs loaded: ${availableJobs.length}');
-
-        // Log the first provider to verify phone and image data
-        if (availableJobs.isNotEmpty) {
-          debugPrint('First provider data: ${jsonEncode(availableJobs.first)}');
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading available jobs: $e');
-      availableJobs.value = [];
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  // Refresh all data
   Future<void> refreshData() async {
     await _loadInitialStatus();
-    await loadAvailableJobs();
+    await loadAppointments();
   }
-
-  // Getters
-  bool get getIsOnline => isOnline.value;
-  bool get getIsWorking => isWorking.value;
-  int get getUserId => userId.value;
-  String get getEmail => userEmail.value;
-  String get getPhoneNumber => phoneNumber.value;
-  String get getProfileImage => profileImage.value;
-  String get getCurrentAddressName => currentAddressName.value;
-  double get getCurrentLatitude => currentLatitude.value;
-  double get getCurrentLongitude => currentLongitude.value;
-  bool get getIsLoading => isLoading.value;
-  bool get getIsLocationLoading => isLocationLoading.value;
-  Map<String, dynamic> get getProviderStats => providerStats.value;
-  List get getAvailableJobs => availableJobs.value;
-  UserLocation get getUserLocation => userLocation.value;
-  bool get getIsTrackingLocation => isTrackingLocation.value;
-  String get getErrorMessage => errorMessage.value;
 }

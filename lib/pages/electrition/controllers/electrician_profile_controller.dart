@@ -52,6 +52,7 @@ class ElectricianProfileController extends GetxController {
   final RxString successMessage = ''.obs;
   final RxString debugLog = ''.obs;
 
+
   // Constants
   final Color darkBlue = const Color(0xFF003E6B);
   final Color tealBlue = const Color(0xFF00A8A8);
@@ -232,6 +233,7 @@ class ElectricianProfileController extends GetxController {
       areaController.text = address;
     } catch (e) {
       errorMessage.value = "Error getting location: $e";
+      print(e);
     } finally {
       isLoading.value = false;
     }
@@ -354,7 +356,7 @@ class ElectricianProfileController extends GetxController {
             (isUpdate ? 'Profile updated successfully' : 'Profile created successfully');
 
         try {
-          await saveProfileToCloud;
+          await saveProfileToCloud();
         }catch (e) {
           _logDebug('Firebase backup failed: $e');
         }

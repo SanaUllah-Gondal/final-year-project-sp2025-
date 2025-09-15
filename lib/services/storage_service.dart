@@ -61,7 +61,7 @@ class StorageService {
   String? getEmail() => _preferences.getString(_kEmail);
   String? getName() => _preferences.getString(_kName);
   String? getPhoneNumber() => _preferences.getString(_kPhoneNumber);
-  String? getProfileImage() => _preferences.getString(_kProfileImage);
+  String?   getProfileImage() => _preferences.getString(_kProfileImage);
 
   /// Setters for phone number and profile image
   Future<void> savePhoneNumber(String phoneNumber) async {

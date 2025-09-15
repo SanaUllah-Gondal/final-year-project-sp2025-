@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:plumber_project/services/storage_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../pages/Apis.dart';
 
 class ApiService extends GetxService {
@@ -12,6 +13,58 @@ class ApiService extends GetxService {
   void _log(String message) {
     if (debugMode) {
       debugPrint('[ApiService] $message');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getAppointments(String serviceType) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    // Determine the correct endpoint based on service type
+    String endpoint;
+    switch (serviceType.toLowerCase()) {
+      case 'plumber':
+        endpoint = '$baseUrl/api/appointments/plumber';
+        break;
+      case 'cleaner':
+        endpoint = '$baseUrl/api/appointments/cleaner';
+        break;
+      case 'electrician':
+        endpoint = '$baseUrl/api/appointments/electrician';
+        break;
+      default:
+        return {
+          'success': false,
+          'message': 'Invalid service type: $serviceType'
+        };
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(endpoint),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (_isHtml1(response.body)) {
+        return {
+          'success': false,
+          'message': 'Server error: Invalid HTML response',
+          'statusCode': response.statusCode,
+        };
+      }
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': responseData['data']};
+      }
+      return {
+        'success': false,
+        'message': responseData['message'] ?? 'Failed to fetch appointments',
+        'statusCode': response.statusCode,
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
     }
   }
 
@@ -109,6 +162,230 @@ class ApiService extends GetxService {
     } catch (e) {
       _log('PUT $path error: $e');
       rethrow;
+    }
+  }
+  Future<Map<String, dynamic>> getCleanerAppointments() async {
+    StorageService _storageService = Get.find();
+    final token = await _storageService.getToken();
+
+    print('Making GET request to: $baseUrl/api/appointments/cleaner');
+    print('Token: ${token != null ? "Present" : "Missing"}');
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/appointments/cleaner'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      print('HTTP Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+      print('Response Headers: ${response.headers}');
+
+      if (_isHtml(response.body)) {
+        print('Response is HTML instead of JSON');
+        return {
+          'success': false,
+          'message': 'Server error: Invalid HTML response',
+          'data': []
+        };
+      }
+
+      final responseData = json.decode(response.body);
+      print('Parsed JSON response: $responseData');
+
+      if (response.statusCode == 200) {
+        print('Request successful, returning data');
+        return {
+          'success': true,
+          'data': responseData['data'] ?? [],
+        };
+      }
+
+      print('Request failed with status: ${response.statusCode}');
+      return {
+        'success': false,
+        'message': responseData['message'] ?? 'Failed to fetch appointments',
+        'data': []
+      };
+    } catch (e) {
+      print('Exception in getCleanerAppointments: $e');
+
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+        'data': []
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> getPlumberAppointments() async {
+    StorageService _storageService = Get.find();
+    final token = await _storageService.getToken();
+
+    print('Making GET request to: $baseUrl/api/appointments/plumber');
+    print('Token: ${token != null ? "Present" : "Missing"}');
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/appointments/plumber'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      print('HTTP Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+      print('Response Headers: ${response.headers}');
+
+      if (_isHtml(response.body)) {
+        print('Response is HTML instead of JSON');
+        return {
+          'success': false,
+          'message': 'Server error: Invalid HTML response',
+          'data': []
+        };
+      }
+
+      final responseData = json.decode(response.body);
+      print('Parsed JSON response: $responseData');
+
+      if (response.statusCode == 200) {
+        print('Request successful, returning data');
+        return {
+          'success': true,
+          'data': responseData['data'] ?? [],
+        };
+      }
+
+      print('Request failed with status: ${response.statusCode}');
+      return {
+        'success': false,
+        'message': responseData['message'] ?? 'Failed to fetch appointments',
+        'data': []
+      };
+    } catch (e) {
+      print('Exception in getPlumberAppointments: $e');
+
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+        'data': []
+      };
+    }
+  }
+  Future<Map<String, dynamic>> getElectricianAppointments() async {
+    StorageService _storageService = Get.find();
+    final token = await _storageService.getToken();
+
+    print('Making GET request to: $baseUrl/api/appointments/electrician');
+    print('Token: ${token != null ? "Present" : "Missing"}');
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/appointments/electrician'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      print('HTTP Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+      print('Response Headers: ${response.headers}');
+
+      if (_isHtml(response.body)) {
+        print('Response is HTML instead of JSON');
+        return {
+          'success': false,
+          'message': 'Server error: Invalid HTML response',
+          'data': []
+        };
+      }
+
+      final responseData = json.decode(response.body);
+      print('Parsed JSON response: $responseData');
+
+      if (response.statusCode == 200) {
+        print('Request successful, returning data');
+        return {
+          'success': true,
+          'data': responseData['data'] ?? [],
+        };
+      }
+
+      print('Request failed with status: ${response.statusCode}');
+      return {
+        'success': false,
+        'message': responseData['message'] ?? 'Failed to fetch appointments',
+        'data': []
+      };
+    } catch (e) {
+      print('Exception in getElectricianAppointments: $e');
+
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+        'data': []
+      };
+    }
+  }
+  bool _isHtml(String responseBody) {
+    final trimmed = responseBody.trim();
+    return trimmed.startsWith('<!DOCTYPE html') ||
+        trimmed.startsWith('<html') ||
+        trimmed.contains('<body') ||
+        trimmed.contains('<head') ||
+        trimmed.contains('<title') ||
+        trimmed.startsWith('HTTP') ||
+        trimmed.contains('<!DOCTYPE HTML');
+  }
+  Future<Map<String, dynamic>> updateAppointmentStatus(
+      String serviceType,
+      String appointmentId,
+      String status
+      ) async {
+    StorageService _storageService= Get.find();
+    final token = await _storageService.getToken();
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/api/appointments/$serviceType/$appointmentId/status'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+        body: json.encode({'status': status}),
+      );
+
+      if (_isHtml(response.body)) {
+        return {
+          'success': false,
+          'message': 'Server error: Invalid HTML response',
+        };
+      }
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Status updated successfully',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': responseData['message'] ?? 'Failed to update status',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+      };
     }
   }
 
@@ -317,5 +594,10 @@ class ApiService extends GetxService {
       _log('Get user email error: $e');
       return null;
     }
+  }
+
+  static bool _isHtml1(String response) {
+    final t = response.trim().toLowerCase();
+    return t.startsWith('<!doctype html') || t.startsWith('<html');
   }
 }

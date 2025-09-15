@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:plumber_project/controllers/dashboard_controller.dart';
-import 'package:plumber_project/pages/plumber/controllers/plumber_dashboard_controller.dart';
-import 'package:plumber_project/pages/plumber/plumberrequest.dart';
 import 'package:plumber_project/pages/plumber/plumber_widgets/plumber_dashboard_card.dart';
 import 'package:plumber_project/pages/users/profile.dart';
 import 'package:plumber_project/pages/notification.dart';
+import 'package:plumber_project/pages/plumber/plumber_appointment_list.dart';
+import 'controllers/plumber_dashboard_controller.dart';
 
+// Color Constants
 final Color darkBlue = Color(0xFF003E6B);
-final Color tealBlue = Color(0xFF00A8A8);
+final Color tealColor = Color(0xFF008080);
 final Color onlineColor = Color(0xFF4CAF50);
 final Color offlineColor = Color(0xFFF44336);
 final Color workingColor = Color(0xFFFF9800);
+final Color accentYellow = Color(0xFFFFD700);
 
 class PlumberDashboard extends StatelessWidget {
   final DashboardController _dashboardController = Get.find();
-  final PlumberDashboardController _plumberController = Get.put(PlumberDashboardController());
+  final PlumberDashboardController _plumberController = Get.find();
 
   @override
   Widget build(BuildContext context) {
@@ -27,39 +29,28 @@ class PlumberDashboard extends StatelessWidget {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 28,
-            color: Colors.black,
+            color: Colors.white,
+            letterSpacing: 1.2,
           ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: const IconThemeData(color: Colors.white),
+        centerTitle: true,
         actions: [
           Obx(() => _buildStatusIndicator()),
+          SizedBox(width: 16),
         ],
       ),
       body: Obx(() => _pages[_dashboardController.selectedIndex.value]),
-      bottomNavigationBar: Obx(
-            () => BottomNavigationBar(
-          currentIndex: _dashboardController.selectedIndex.value,
-          onTap: (index) => _onItemTapped(index, context),
-          selectedItemColor: Colors.yellow,
-          unselectedItemColor: Colors.white,
-          backgroundColor: tealBlue,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.notifications), label: 'Notifications'),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          ],
-        ),
-      ),
+      bottomNavigationBar: _buildBottomNavigationBar(context),
     );
   }
 
   Widget _buildStatusIndicator() {
     return Container(
       margin: EdgeInsets.only(right: 16),
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: _plumberController.isWorking.value
             ? workingColor
@@ -67,24 +58,90 @@ class PlumberDashboard extends StatelessWidget {
             ? onlineColor
             : offlineColor,
         borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
-      child: Obx(() => Text(
-        _plumberController.isWorking.value
-            ? 'Working'
-            : _plumberController.isOnline.value
-            ? 'Online'
-            : 'Offline',
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _plumberController.isWorking.value
+                ? Icons.work
+                : _plumberController.isOnline.value
+                ? Icons.wifi
+                : Icons.wifi_off,
+            size: 16,
+            color: Colors.white,
+          ),
+          SizedBox(width: 6),
+          Text(
+            _plumberController.isWorking.value
+                ? 'Working'
+                : _plumberController.isOnline.value
+                ? 'Online'
+                : 'Offline',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Obx(
+            () => BottomNavigationBar(
+          currentIndex: _dashboardController.selectedIndex.value,
+          onTap: (index) => _onItemTapped(index, context),
+          selectedItemColor: accentYellow,
+          unselectedItemColor: Colors.white70,
+          backgroundColor: tealColor,
+          showSelectedLabels: true,
+          showUnselectedLabels: true,
+          type: BottomNavigationBarType.fixed,
+          elevation: 10,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.notifications_outlined),
+              activeIcon: Icon(Icons.notifications),
+              label: 'Notifications',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outlined),
+              activeIcon: Icon(Icons.person),
+              label: 'Profile',
+            ),
+          ],
         ),
-      )),
+      ),
     );
   }
 
   final List<Widget> _pages = [
-    HomeContent(),
+    PlumberHomeContent(),
     NotificationsScreen(),
     ProfileScreen(),
   ];
@@ -106,59 +163,68 @@ class PlumberDashboard extends StatelessWidget {
   }
 }
 
-class HomeContent extends StatelessWidget {
+class PlumberHomeContent extends StatelessWidget {
   final PlumberDashboardController _controller = Get.find();
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(20.0),
       child: Column(
         children: [
           // Online/Offline Toggle Button
           Obx(() => _buildStatusToggleButton()),
-          SizedBox(height: 20),
+          SizedBox(height: 24),
+
+          // Dashboard Cards Grid
           Expanded(
             child: GridView.count(
               crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
+              crossAxisSpacing: 20,
+              mainAxisSpacing: 20,
+              childAspectRatio: 0.85,
+              padding: EdgeInsets.zero,
               children: [
-                DashboardCard(
+                Obx(() => PlumberDashboardCard(
                   title: "New Requests",
-                  icon: Icons.assignment,
-                  gradientColors: [Color(0xFFF7971E), Color(0xFFFFD200)],
+                  icon: Icons.plumbing,
+                  gradientColors: [Color(0xFF00B4DB), Color(0xFF0083B0)],
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => AppointmentList()),
+                      MaterialPageRoute(builder: (context) => PlumberAppointmentList()),
                     );
                   },
-                ),
-                DashboardCard(
+                  showBadge: _controller.hasPendingRequests.value,
+                  badgeCount: _controller.pendingRequestCount.value,
+                )),
+                PlumberDashboardCard(
                   title: "Ongoing Jobs",
                   icon: Icons.work,
-                  gradientColors: [Color(0xFF36D1DC), Color(0xFF5B86E5)],
+                  gradientColors: [Color(0xFF56CCF2), Color(0xFF2F80ED)],
                   onTap: () {
-                    // Handle ongoing jobs tap
                     _controller.updateWorkingStatus(true);
                   },
                 ),
-                DashboardCard(
+                PlumberDashboardCard(
                   title: "Completed Jobs",
                   icon: Icons.check_circle,
-                  gradientColors: [Color(0xFF00b09b), Color(0xFF96c93d)],
+                  gradientColors: [Color(0xFF76B852), Color(0xFF8DC26F)],
                   onTap: () {
-                    // Handle completed jobs tap
                     _controller.updateWorkingStatus(false);
                   },
                 ),
-                DashboardCard(
+                PlumberDashboardCard(
                   title: "Earnings",
                   icon: Icons.attach_money,
-                  gradientColors: [Color(0xFFF953C6), Color(0xFFB91D73)],
+                  gradientColors: [Color(0xFFDA22FF), Color(0xFF9733EE)],
                   onTap: () {
                     // Handle earnings tap
+                    Get.snackbar(
+                      'Coming Soon',
+                      'Earnings feature will be available soon!',
+                      snackPosition: SnackPosition.BOTTOM,
+                    );
                   },
                 ),
               ],
@@ -174,7 +240,7 @@ class HomeContent extends StatelessWidget {
       onTap: _controller.toggleOnlineStatus,
       child: Container(
         width: double.infinity,
-        padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+        padding: EdgeInsets.symmetric(vertical: 18, horizontal: 24),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: _controller.isOnline.value
@@ -190,35 +256,41 @@ class HomeContent extends StatelessWidget {
                   ? offlineColor.withOpacity(0.4)
                   : onlineColor.withOpacity(0.4),
               offset: Offset(0, 6),
-              blurRadius: 10,
+              blurRadius: 12,
+              spreadRadius: 1,
             ),
           ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Obx(() => Icon(
-              _controller.isOnline.value ? Icons.wifi_off : Icons.wifi,
-              color: Colors.white,
-              size: 24,
+            Obx(() => AnimatedSwitcher(
+              duration: Duration(milliseconds: 300),
+              child: Icon(
+                _controller.isOnline.value ? Icons.wifi_off : Icons.wifi,
+                key: ValueKey(_controller.isOnline.value),
+                color: Colors.white,
+                size: 24,
+              ),
             )),
-            SizedBox(width: 10),
+            SizedBox(width: 12),
             Obx(() => Text(
               _controller.isOnline.value ? 'Go Offline' : 'Go Online',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
               ),
             )),
             Obx(() => _controller.isLoading.value
                 ? Padding(
-              padding: EdgeInsets.only(left: 10),
+              padding: EdgeInsets.only(left: 12),
               child: SizedBox(
-                width: 16,
-                height: 16,
+                width: 18,
+                height: 18,
                 child: CircularProgressIndicator(
-                  strokeWidth: 2,
+                  strokeWidth: 2.5,
                   valueColor: AlwaysStoppedAnimation(Colors.white),
                 ),
               ),

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
@@ -153,9 +154,9 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
 
       // Get provider ID and ensure it's a string
       final providerId = widget.provider['provider_id'] ?? widget.provider['id'];
-      final providerIdString = providerId.toString(); // Convert to string
+      final providerIdString = providerId.toString();
 
-      // Add form data - ensure all values are strings
+      // Add form data
       request.fields['provider_id'] = providerIdString;
       request.fields['appointment_type'] = _appointmentType!;
       request.fields['sub_service_type'] = _selectedServiceType!;
@@ -165,12 +166,6 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
       request.fields['base_price'] = widget.basePrice.toString();
       request.fields['latitude'] = widget.userLocation.latitude.toString();
       request.fields['longitude'] = widget.userLocation.longitude.toString();
-
-      print("📤 Sending appointment data:");
-      print("Provider ID: $providerIdString");
-      print("Appointment Type: ${_appointmentType!}");
-      print("Sub Service Type: ${_selectedServiceType!}");
-      print("Base Price: ${widget.basePrice}");
 
       // Add image file if selected
       if (_problemImage != null) {
@@ -186,7 +181,6 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
         );
 
         request.files.add(multipartFile);
-        print("📷 Image attached: ${_problemImage!.path}");
       }
 
       // Send request
@@ -199,6 +193,12 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
       var result = json.decode(responseData);
 
       if (response.statusCode == 201) {
+        // 🔥 Save to Firebase as backup
+        await _saveAppointmentToFirebase(
+          providerId: providerIdString,
+          appointmentDateTime: appointmentDateTime,
+        );
+
         _showConfirmationDialog();
       } else {
         _showErrorDialog(result['message'] ?? 'Failed to create appointment. Status: ${response.statusCode}');
@@ -210,6 +210,61 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  /// Save appointment details into Firebase Firestore
+  Future<void> _saveAppointmentToFirebase({
+    required String providerId,
+    required DateTime appointmentDateTime,
+  }) async {
+    try {
+      // ✅ Pick correct collection
+      String collectionName;
+      switch (widget.serviceType.toLowerCase()) {
+        case 'cleaner':
+          collectionName = 'cleaner_appointment';
+          break;
+        case 'plumber':
+          collectionName = 'plumber_appointment';
+          break;
+        case 'electrician':
+          collectionName = 'electrician_appointment';
+          break;
+        default:
+          collectionName = 'general_appointment';
+      }
+
+      // ✅ Convert image to base64 if available
+      String? base64Image;
+      if (_problemImage != null) {
+        final bytes = await _problemImage!.readAsBytes();
+        base64Image = base64Encode(bytes);
+      }
+
+      // ✅ Build appointment data
+      final appointmentData = {
+        'provider_id': providerId,
+        'appointment_type': _appointmentType,
+        'sub_service_type': _selectedServiceType,
+        'description': _descriptionController.text,
+        'appointment_date': appointmentDateTime.toIso8601String(),
+        'address': _addressController.text,
+        'base_price': widget.basePrice,
+        'latitude': widget.userLocation.latitude,
+        'longitude': widget.userLocation.longitude,
+        'problem_image': base64Image,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      // ✅ Save into Firestore
+      await FirebaseFirestore.instance
+          .collection(collectionName)
+          .add(appointmentData);
+
+      print("🔥 Appointment saved to Firebase in $collectionName");
+    } catch (e) {
+      print("❌ Error saving to Firebase: $e");
     }
   }
 

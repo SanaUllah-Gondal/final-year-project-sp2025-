@@ -349,6 +349,16 @@ class UserProfileController extends GetxController {
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseData = json.decode(response.body);
+
+
+
+        try {
+          await saveProfileToCloud();
+        }catch (e) {
+          _logDebug('Firebase backup failed: $e');
+        }
+
+
         successMessage.value = responseData['message'] ??
             (isUpdate
                 ? 'Profile updated successfully'
