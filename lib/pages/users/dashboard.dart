@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:plumber_project/pages/users/booking.dart';
-import 'package:plumber_project/pages/users/user_dashboard_controller.dart';
+import 'package:plumber_project/pages/users/controllers/user_dashboard_controller.dart';
+
+import 'appointments_screen.dart';
 
 final Color darkBlue = Color(0xFF003E6B);
 final Color tealBlue = Color(0xFF00A8A8);
@@ -33,6 +35,17 @@ class HomeScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
+            ),
+            Spacer(),
+            IconButton(
+              icon: Icon(Icons.calendar_today, color: Colors.white),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => UserAppointmentsScreen()),
+                );
+              },
+              tooltip: 'My Appointments',
             ),
             Spacer(),
             // Location display

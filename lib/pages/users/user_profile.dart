@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:plumber_project/pages/users/user_profile_controlller.dart';
+import 'package:plumber_project/pages/users/controllers/user_profile_controlller.dart';
 
 class UserProfilePage extends StatelessWidget {
   final UserProfileController controller = Get.put(UserProfileController());

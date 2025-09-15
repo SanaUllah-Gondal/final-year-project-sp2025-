@@ -6,7 +6,7 @@ import 'package:plumber_project/pages/authentication/auth_service.dart';
 import 'package:plumber_project/pages/cleaner/controllers/cleaner_dashboard_controller.dart';
 import 'package:plumber_project/pages/electrition/controllers/electrician_dashboard_controller.dart';
 import 'package:plumber_project/pages/plumber/controllers/plumber_dashboard_controller.dart';
-import 'package:plumber_project/pages/users/user_dashboard_controller.dart';
+import 'package:plumber_project/pages/users/controllers/user_dashboard_controller.dart';
 import 'package:plumber_project/services/api_service.dart';
 import 'package:plumber_project/services/storage_service.dart';
 

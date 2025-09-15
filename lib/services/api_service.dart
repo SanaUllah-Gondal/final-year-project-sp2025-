@@ -595,6 +595,9 @@ class ApiService extends GetxService {
       return null;
     }
   }
+  Future<Map<String, dynamic>> cancelAppointment(String serviceType, String appointmentId) async {
+    return await post('/api/$serviceType-appointments/$appointmentId/cancel');
+  }
 
   static bool _isHtml1(String response) {
     final t = response.trim().toLowerCase();
