@@ -1,3 +1,1 @@
-<?php
-
-// Api.Php
+// Sample content for routes/api.php
