@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
@@ -6,10 +7,13 @@ import 'package:geocoding/geocoding.dart';
 import 'package:plumber_project/services/api_service.dart';
 import 'package:plumber_project/services/storage_service.dart';
 import 'package:plumber_project/models/user_location.dart';
+import '../../../notification/fcm_service.dart';
+import '../../../notification/notification_service.dart';
 
 class CleanerDashboardController extends GetxController {
-  final ApiService _apiService = Get.find();
-  final StorageService _storageService = Get.find();
+  final ApiService _apiService = Get.find<ApiService>();
+  final StorageService _storageService = Get.find<StorageService>();
+  final NotificationService notificationService = Get.find<NotificationService>();
 
   // Observable variables
   var isOnline = false.obs;
@@ -21,6 +25,7 @@ class CleanerDashboardController extends GetxController {
   var userEmail = ''.obs;
   var phoneNumber = ''.obs;
   var profileImage = ''.obs;
+  var deviceToken = ''.obs;
   var providerStats = <String, dynamic>{}.obs;
   var availableJobs = [].obs;
   var hasPendingRequests = false.obs;
@@ -56,11 +61,75 @@ class CleanerDashboardController extends GetxController {
 
   Future<void> _initializeController() async {
     try {
+      debugPrint('[CleanerDashboardController] Initializing...');
+
+      // Load user data first
       await _loadUserData();
+
+      // Initialize device token and FCM services
+      await _initializeDeviceToken();
+
+      // Load initial status and appointments
       await _loadInitialStatus();
       await loadAppointments();
+
+      debugPrint('[CleanerDashboardController] Initialization complete');
     } catch (e) {
-      debugPrint('Error initializing controller: $e');
+      debugPrint('[CleanerDashboardController] Error initializing: $e');
+    }
+  }
+
+  Future<void> _initializeDeviceToken() async {
+    try {
+      debugPrint('[CleanerDashboardController] Getting device token...');
+
+      final token = await notificationService.getDeviceToken();
+      deviceToken.value = token;
+      debugPrint('[CleanerDashboardController] Device token obtained: $token');
+
+      // Initialize FCM services
+      FcmService.firebaseInit();
+      notificationService.firebaseInit();
+      notificationService.setupInteractMessage();
+
+      // Save token to Firebase
+      await saveDeviceToken();
+
+    } catch (e) {
+      debugPrint('[CleanerDashboardController] Error initializing device token: $e');
+    }
+  }
+
+  Future<void> saveDeviceToken() async {
+    try {
+      final email = userEmail.value;
+      final token = deviceToken.value;
+      final id = userId.value;
+
+      if (email.isEmpty) {
+        debugPrint('Email is empty, skipping token save');
+        return;
+      }
+
+      if (token.isEmpty) {
+        debugPrint('Device token is empty, skipping save');
+        return;
+      }
+
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+      final CollectionReference tokensCollection = firestore.collection('userTokens');
+
+      await tokensCollection.doc(email).set({
+        'email': email,
+        'deviceToken': token,
+        'userId': id,
+        'userType': 'cleaner',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      debugPrint('✅ Device token saved for cleaner: $email');
+    } catch (e) {
+      debugPrint('❌ Error saving device token: $e');
     }
   }
 
@@ -100,6 +169,8 @@ class CleanerDashboardController extends GetxController {
       userEmail.value = storedUserEmail ?? '';
       phoneNumber.value = storedPhoneNumber ?? '';
       profileImage.value = storedProfileImage ?? '';
+
+      debugPrint('[CleanerDashboardController] User data loaded - Email: ${userEmail.value}');
     } catch (e) {
       debugPrint('Error loading user data: $e');
     }
@@ -157,7 +228,6 @@ class CleanerDashboardController extends GetxController {
             position.longitude
         );
       }
-
     } catch (e) {
       errorMessage.value = "Error getting location: $e";
     } finally {
@@ -219,7 +289,6 @@ class CleanerDashboardController extends GetxController {
       });
 
       isTrackingLocation.value = true;
-
     } catch (e) {
       errorMessage.value = "Error starting location tracking: $e";
     }
@@ -230,7 +299,8 @@ class CleanerDashboardController extends GetxController {
     isTrackingLocation.value = false;
   }
 
-  Future<void> _updateLocationOnServer(String addressName, double latitude, double longitude) async {
+  Future<void> _updateLocationOnServer(String addressName, double latitude,
+      double longitude) async {
     try {
       await _apiService.updateProviderLocation(
         providerType: 'cleaner',
@@ -342,7 +412,8 @@ class CleanerDashboardController extends GetxController {
         final providerData = response['data'];
         isOnline.value = providerData['is_online'] ?? false;
         isWorking.value = providerData['is_working'] ?? false;
-        currentAddressName.value = providerData['address_name'] ?? 'Location not available';
+        currentAddressName.value =
+            providerData['address_name'] ?? 'Location not available';
         currentLatitude.value = providerData['latitude']?.toDouble() ?? 0.0;
         currentLongitude.value = providerData['longitude']?.toDouble() ?? 0.0;
 

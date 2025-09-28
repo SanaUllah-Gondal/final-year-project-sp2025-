@@ -64,7 +64,7 @@ class HomeScreen extends StatelessWidget {
             icon: Icon(Icons.more_vert, color: Colors.white),
             onSelected: (value) {
               if (value == 'booking-request') {
-                Get.to(() => RequestScreen());
+                Get.to(() => UserAppointmentsScreen());
               }
             },
             itemBuilder: (context) => [

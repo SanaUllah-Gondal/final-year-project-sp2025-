@@ -59,9 +59,17 @@ dependencies:
   intl: ^0.20.2
   photo_view: ^0.15.0
   location: ^8.0.1
+  firebase_messaging: ^16.0.2
+  overlay_support: ^2.1.0
+  googleapis_auth: ^2.0.0
+  flutter_local_notifications: ^19.4.2
+  path: ^1.9.1
+  googleapis: ^15.0.0
   
 
 dev_dependencies:
+  flutter_localizations:
+    sdk: flutter
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.14.3

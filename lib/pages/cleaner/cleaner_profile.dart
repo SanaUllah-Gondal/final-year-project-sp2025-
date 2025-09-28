@@ -14,6 +14,7 @@ class CleanerProfilePage extends StatelessWidget {
           controller.profileExists.value ? "Update Profile" : "Create Profile",
           style: TextStyle(color: Colors.white),
         )),
+
         backgroundColor: controller.darkBlue,
         iconTheme: IconThemeData(color: Colors.white),
       ),

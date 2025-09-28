@@ -5,7 +5,6 @@ import 'package:plumber_project/services/api_service.dart';
 import 'package:plumber_project/widgets/app_color.dart';
 import 'package:plumber_project/widgets/app_text_style.dart';
 import 'package:plumber_project/widgets/loading_shimmer.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 class UserAppointmentsScreen extends StatefulWidget {
   @override
@@ -288,6 +287,9 @@ class _UserAppointmentsScreenState extends State<UserAppointmentsScreen> {
     final provider = appointment['provider'] ?? {};
     final providerName = provider['name'] ?? 'Unknown Provider';
     final providerImage = provider['profile_image'];
+    final price = appointment['price'] is String
+        ? double.tryParse(appointment['price']) ?? 0.0
+        : (appointment['price']?.toDouble() ?? 0.0);
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -425,7 +427,7 @@ class _UserAppointmentsScreenState extends State<UserAppointmentsScreen> {
                     Icon(Icons.attach_money, size: 16, color: AppColors.primaryColor),
                     SizedBox(width: 8),
                     Text(
-                      '\$${appointment['price']?.toStringAsFixed(2) ?? '0.00'}',
+                      '\$${price.toStringAsFixed(2)}',
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: AppColors.darkColor,
                         fontWeight: FontWeight.w600,

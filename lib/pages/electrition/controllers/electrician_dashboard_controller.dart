@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
@@ -6,10 +7,13 @@ import 'package:geocoding/geocoding.dart';
 import 'package:plumber_project/services/api_service.dart';
 import 'package:plumber_project/services/storage_service.dart';
 import 'package:plumber_project/models/user_location.dart';
+import '../../../notification/fcm_service.dart';
+import '../../../notification/notification_service.dart';
 
 class ElectricianDashboardController extends GetxController {
-  final ApiService _apiService = Get.find();
-  final StorageService _storageService = Get.find();
+  final ApiService _apiService = Get.find<ApiService>();
+  final StorageService _storageService = Get.find<StorageService>();
+  final NotificationService notificationService = Get.find<NotificationService>();
 
   // Observable variables
   var isOnline = false.obs;
@@ -21,6 +25,7 @@ class ElectricianDashboardController extends GetxController {
   var userEmail = ''.obs;
   var phoneNumber = ''.obs;
   var profileImage = ''.obs;
+  var deviceToken = ''.obs;
   var providerStats = <String, dynamic>{}.obs;
   var availableJobs = [].obs;
   var hasPendingRequests = false.obs;
@@ -56,11 +61,75 @@ class ElectricianDashboardController extends GetxController {
 
   Future<void> _initializeController() async {
     try {
+      debugPrint('[ElectricianDashboardController] Initializing...');
+
+      // Load user data first
       await _loadUserData();
+
+      // Initialize device token and FCM services
+      await _initializeDeviceToken();
+
+      // Load initial status and appointments
       await _loadInitialStatus();
       await loadAppointments();
+
+      debugPrint('[ElectricianDashboardController] Initialization complete');
     } catch (e) {
-      debugPrint('Error initializing controller: $e');
+      debugPrint('[ElectricianDashboardController] Error initializing: $e');
+    }
+  }
+
+  Future<void> _initializeDeviceToken() async {
+    try {
+      debugPrint('[ElectricianDashboardController] Getting device token...');
+
+      final token = await notificationService.getDeviceToken();
+      deviceToken.value = token;
+      debugPrint('[ElectricianDashboardController] Device token obtained: $token');
+
+      // Initialize FCM services
+      FcmService.firebaseInit();
+      notificationService.firebaseInit();
+      notificationService.setupInteractMessage();
+
+      // Save token to Firebase
+      await saveDeviceToken();
+
+    } catch (e) {
+      debugPrint('[ElectricianDashboardController] Error initializing device token: $e');
+    }
+  }
+
+  Future<void> saveDeviceToken() async {
+    try {
+      final email = userEmail.value;
+      final token = deviceToken.value;
+      final id = userId.value;
+
+      if (email.isEmpty) {
+        debugPrint('Email is empty, skipping token save');
+        return;
+      }
+
+      if (token.isEmpty) {
+        debugPrint('Device token is empty, skipping save');
+        return;
+      }
+
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+      final CollectionReference tokensCollection = firestore.collection('userTokens');
+
+      await tokensCollection.doc(email).set({
+        'email': email,
+        'deviceToken': token,
+        'userId': id,
+        'userType': 'electrician',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      debugPrint('✅ Device token saved for electrician: $email');
+    } catch (e) {
+      debugPrint('❌ Error saving device token: $e');
     }
   }
 
@@ -100,6 +169,8 @@ class ElectricianDashboardController extends GetxController {
       userEmail.value = storedUserEmail ?? '';
       phoneNumber.value = storedPhoneNumber ?? '';
       profileImage.value = storedProfileImage ?? '';
+
+      debugPrint('[ElectricianDashboardController] User data loaded - Email: ${userEmail.value}');
     } catch (e) {
       debugPrint('Error loading user data: $e');
     }

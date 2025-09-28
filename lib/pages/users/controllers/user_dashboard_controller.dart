@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -8,6 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:plumber_project/pages/Apis.dart';
+import '../../../notification/fcm_service.dart';
+import '../../../notification/notification_service.dart';
+import '../../../services/storage_service.dart';
 import '../profile.dart';
 import '../../emergency.dart';
 
@@ -15,6 +19,13 @@ class HomeController extends GetxController {
   var showSearchBar = false.obs;
   var selectedIndex = 0.obs;
   var userLocation = 'Fetching location...'.obs;
+  var userEmail = ''.obs;
+  var phoneNumber = ''.obs;
+  var profileImage = ''.obs;
+  var deviceToken = ''.obs;
+  var userId = 0.obs;
+  final NotificationService notificationService = Get.find<NotificationService>();
+  final StorageService _storageService = Get.find<StorageService>();
 
   var userCoordinates = Position(
     latitude: 0.0,
@@ -49,16 +60,110 @@ class HomeController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    debugPrint('[HomeController] Initializing...');
-    filteredServices.assignAll(services);
-    fetchUserLocation();
-    loadSavedLocations();
+    _initializeController();
   }
 
   @override
   void onClose() {
     searchController.dispose();
     super.onClose();
+  }
+
+  Future<void> _initializeController() async {
+    try {
+      debugPrint('[HomeController] Initializing...');
+
+      // Load user data first
+      await _loadUserData();
+
+      // Initialize services
+      filteredServices.assignAll(services);
+
+      // Get device token and save it
+      await _initializeDeviceToken();
+
+      // Load other data
+      await fetchUserLocation();
+      await loadSavedLocations();
+
+      debugPrint('[HomeController] Initialization complete');
+    } catch (e) {
+      debugPrint('[HomeController] Error during initialization: $e');
+    }
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final storedUserId = await _storageService.getUserId();
+      final storedUserEmail = await _storageService.getEmail();
+      final storedPhoneNumber = await _storageService.getPhoneNumber();
+      final storedProfileImage = await _storageService.getProfileImage();
+
+      userId.value = storedUserId ?? 0;
+      userEmail.value = storedUserEmail ?? '';
+      phoneNumber.value = storedPhoneNumber ?? '';
+      profileImage.value = storedProfileImage ?? '';
+
+      debugPrint('[HomeController] User data loaded - Email: ${userEmail.value}');
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+    }
+  }
+
+  Future<void> _initializeDeviceToken() async {
+    try {
+      debugPrint('[HomeController] Getting device token...');
+
+      // Get device token
+      final token = await notificationService.getDeviceToken();
+      deviceToken.value = token;
+      debugPrint('[HomeController] Device token obtained: $token');
+
+      // Initialize FCM services
+      FcmService.firebaseInit();
+      notificationService.firebaseInit();
+      notificationService.setupInteractMessage();
+
+      // Save token to Firebase
+      await saveDeviceToken();
+
+    } catch (e) {
+      debugPrint('[HomeController] Error initializing device token: $e');
+    }
+  }
+
+  Future<void> saveDeviceToken() async {
+    try {
+      final email = userEmail.value;
+      final token = deviceToken.value;
+      final id = userId.value;
+
+      // Check if email and token are not empty
+      if (email.isEmpty) {
+        debugPrint('Email is empty, skipping token save');
+        return;
+      }
+
+      if (token.isEmpty) {
+        debugPrint('Device token is empty, skipping save');
+        return;
+      }
+
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+      final CollectionReference tokensCollection = firestore.collection('userTokens');
+
+      // Use email as document ID for easier management
+      await tokensCollection.doc(email).set({
+        'email': email,
+        'deviceToken': token,
+        'userId': id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      debugPrint('✅ Device token saved for user: $email');
+    } catch (e) {
+      debugPrint('❌ Error saving device token: $e');
+    }
   }
 
   Future<void> fetchUserLocation() async {
