@@ -9,8 +9,13 @@
 .buildlog/
 .history
 .svn/
+
 .swiftpm/
 migrate_working_dir/
+
+# Firebase/Notification sensitive files
+lib/notification/get_server_key.dart
+**/get_server_key.dart
 
 # IntelliJ related
 *.iml
@@ -43,3 +48,4 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
