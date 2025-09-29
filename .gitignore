@@ -9,6 +9,8 @@
 .buildlog/
 .history
 .svn/
+.env
+lib/services/stripe.dart
 
 .swiftpm/
 migrate_working_dir/

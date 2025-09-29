@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:plumber_project/pages/users/booking.dart';
 import 'package:plumber_project/pages/users/controllers/user_dashboard_controller.dart';
 
 import 'appointments_screen.dart';
@@ -21,12 +20,32 @@ class HomeScreen extends StatelessWidget {
         backgroundColor: tealBlue,
         title: Row(
           children: [
-            // Service selection button
-            IconButton(
-              icon: Icon(Icons.room_service, color: Colors.black, size: 28),
-              onPressed: () => controller.showServiceSelectionDialog(context),
-              tooltip: 'Select Service Type',
-            ),
+            // Service selection button with red dot indicator
+            Obx(() => Stack(
+              children: [
+                IconButton(
+                  icon: Icon(Icons.room_service, color: Colors.black, size: 28),
+                  onPressed: () => controller.showServiceSelectionDialog(context),
+                  tooltip: 'Select Service Type',
+                ),
+                if (controller.hasPendingAppointments.value)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      constraints: BoxConstraints(
+                        minWidth: 12,
+                        minHeight: 12,
+                      ),
+                    ),
+                  ),
+              ],
+            )),
             SizedBox(width: 8),
             Text(
               "Skill-Link",
@@ -37,16 +56,37 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             Spacer(),
-            IconButton(
-              icon: Icon(Icons.calendar_today, color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => UserAppointmentsScreen()),
-                );
-              },
-              tooltip: 'My Appointments',
-            ),
+            // Calendar icon with red dot indicator
+            Obx(() => Stack(
+              children: [
+                IconButton(
+                  icon: Icon(Icons.calendar_today, color: Colors.white),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => UserAppointmentsScreen()),
+                    );
+                  },
+                  tooltip: 'My Appointments',
+                ),
+                if (controller.hasPendingAppointments.value)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      constraints: BoxConstraints(
+                        minWidth: 12,
+                        minHeight: 12,
+                      ),
+                    ),
+                  ),
+              ],
+            )),
             Spacer(),
             // Location display
             Obx(() => controller.isLoadingLocation.value
@@ -60,26 +100,90 @@ class HomeScreen extends StatelessWidget {
         ),
         elevation: 0,
         actions: [
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: Colors.white),
-            onSelected: (value) {
-              if (value == 'booking-request') {
-                Get.to(() => UserAppointmentsScreen());
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'booking-request',
-                child: Row(
-                  children: [
-                    Icon(Icons.request_page, color: Colors.black),
-                    SizedBox(width: 8),
-                    Text('Booking Request'),
-                  ],
-                ),
+          // More options with red dot indicator
+          Obx(() => Stack(
+            children: [
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: Colors.white),
+                onSelected: (value) {
+                  if (value == 'booking-request') {
+                    Get.to(() => UserAppointmentsScreen());
+                  } else if (value == 'refresh-appointments') {
+                    controller.refreshAppointmentStatus();
+                    Get.snackbar(
+                      'Refreshed',
+                      'Appointment status updated',
+                      backgroundColor: Colors.green,
+                      colorText: Colors.white,
+                    );
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'booking-request',
+                    child: Row(
+                      children: [
+                        Stack(
+                          children: [
+                            Icon(Icons.request_page, color: Colors.black),
+                            if (controller.hasPendingAppointments.value)
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                child: Container(
+                                  padding: EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  constraints: BoxConstraints(
+                                    minWidth: 8,
+                                    minHeight: 8,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        SizedBox(width: 8),
+                        Text('Booking Request'),
+                        if (controller.hasPendingAppointments.value)
+                          Padding(
+                            padding: EdgeInsets.only(left: 8),
+                            child: Text('• Pending', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                          ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'refresh-appointments',
+                    child: Row(
+                      children: [
+                        Icon(Icons.refresh, color: Colors.black),
+                        SizedBox(width: 8),
+                        Text('Refresh Status'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+              if (controller.hasPendingAppointments.value)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    constraints: BoxConstraints(
+                      minWidth: 12,
+                      minHeight: 12,
+                    ),
+                  ),
+                ),
             ],
-          ),
+          )),
         ],
       ),
       body: _buildHomeScreen(context),
@@ -114,6 +218,49 @@ class HomeScreen extends StatelessWidget {
       padding: EdgeInsets.all(10.0),
       child: Column(
         children: [
+          // Pending appointments banner
+          Obx(() => controller.hasPendingAppointments.value
+              ? Container(
+            width: double.infinity,
+            margin: EdgeInsets.only(bottom: 16),
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'You have pending appointments. Please check your appointments screen.',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => UserAppointmentsScreen()),
+                    );
+                  },
+                  child: Text(
+                    'View',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+              : SizedBox.shrink()),
+
           Obx(() => Align(
             alignment: Alignment.centerRight,
             child: controller.showSearchBar.value
@@ -164,6 +311,18 @@ class HomeScreen extends StatelessWidget {
                     style: TextStyle(color: Colors.white70),
                     textAlign: TextAlign.center,
                   ),
+                  SizedBox(height: 8),
+                  Obx(() => controller.hasPendingAppointments.value
+                      ? Text(
+                    '⚠️ You have ongoing appointments. Please complete them before booking new services.',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  )
+                      : SizedBox.shrink()),
                 ],
               ),
             ),

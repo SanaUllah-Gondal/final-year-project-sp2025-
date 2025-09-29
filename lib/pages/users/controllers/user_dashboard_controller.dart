@@ -11,6 +11,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:plumber_project/pages/Apis.dart';
 import '../../../notification/fcm_service.dart';
 import '../../../notification/notification_service.dart';
+import '../../../services/api_service.dart';
 import '../../../services/storage_service.dart';
 import '../profile.dart';
 import '../../emergency.dart';
@@ -26,6 +27,7 @@ class HomeController extends GetxController {
   var userId = 0.obs;
   final NotificationService notificationService = Get.find<NotificationService>();
   final StorageService _storageService = Get.find<StorageService>();
+  final ApiService _apiService = Get.find<ApiService>();
 
   var userCoordinates = Position(
     latitude: 0.0,
@@ -48,6 +50,12 @@ class HomeController extends GetxController {
   var selectedServiceType = ''.obs;
   var isLoadingProviders = false.obs;
   var apiError = ''.obs;
+
+  // New variables for appointment checking
+  var hasPendingAppointments = false.obs;
+  var ongoingAppointment = <String, dynamic>{}.obs;
+  var isLoadingAppointments = false.obs;
+  var allUserAppointments = <Map<String, dynamic>>[].obs;
 
   final TextEditingController searchController = TextEditingController();
 
@@ -86,10 +94,138 @@ class HomeController extends GetxController {
       await fetchUserLocation();
       await loadSavedLocations();
 
+      // Check for pending appointments
+      await checkForPendingAppointments();
+
       debugPrint('[HomeController] Initialization complete');
     } catch (e) {
       debugPrint('[HomeController] Error during initialization: $e');
     }
+  }
+
+  // Check for pending appointments periodically
+  Future<void> checkForPendingAppointments() async {
+    try {
+      isLoadingAppointments.value = true;
+      final response = await _apiService.getUserAppointments();
+
+      if (response['success'] == true) {
+        final appointments = List<Map<String, dynamic>>.from(response['data'] ?? []);
+        allUserAppointments.assignAll(appointments);
+
+        // Check if there are any pending or confirmed appointments
+        final pendingAppointments = appointments.where((appointment) =>
+        appointment['status'] == 'pending' ||
+            appointment['status'] == 'confirmed' ||
+            appointment['status'] == 'accepted'
+        ).toList();
+
+        hasPendingAppointments.value = pendingAppointments.isNotEmpty;
+
+        if (pendingAppointments.isNotEmpty) {
+          ongoingAppointment.value = pendingAppointments.first;
+        }
+
+        debugPrint('[HomeController] Found ${pendingAppointments.length} pending appointments');
+      }
+    } catch (e) {
+      debugPrint('[HomeController] Error checking pending appointments: $e');
+    } finally {
+      isLoadingAppointments.value = false;
+    }
+  }
+
+  // Enhanced appointment checking methods
+  Future<Map<String, dynamic>> checkOngoingAppointmentsForService(String serviceType) async {
+    try {
+      debugPrint('[HomeController] Checking ongoing appointments for: $serviceType');
+
+      // First check local pending appointments
+      if (hasPendingAppointments.value && ongoingAppointment.isNotEmpty) {
+        final currentService = ongoingAppointment['service_type']?.toString().toLowerCase() ?? '';
+        if (currentService == serviceType.toLowerCase()) {
+          return {
+            'hasOngoing': true,
+            'serviceType': currentService,
+            'appointment': ongoingAppointment,
+            'message': 'You already have an ongoing $currentService appointment'
+          };
+        }
+      }
+
+      // Then check with API
+      final response = await _apiService.checkOngoingAppointments(serviceType);
+      return response;
+    } catch (e) {
+      debugPrint('[HomeController] Error checking ongoing appointments: $e');
+      return {
+        'hasOngoing': false,
+        'message': 'Error checking appointments: $e'
+      };
+    }
+  }
+
+  // Check if user can book a new service
+  Future<bool> canBookService(String serviceType) async {
+    try {
+      debugPrint('[HomeController] Checking if can book $serviceType');
+
+      // First check local pending appointments
+      if (hasPendingAppointments.value) {
+        final currentService = ongoingAppointment['service_type']?.toString().toLowerCase() ?? '';
+        if (currentService.isNotEmpty) {
+          return false;
+        }
+      }
+
+      // Then check with API for specific service type
+      final response = await _apiService.checkOngoingAppointments(serviceType);
+
+      if (response['success'] == true && response['hasOngoing'] == true) {
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('[HomeController] Error checking if can book service: $e');
+      return true; // Allow booking if there's an error in checking
+    }
+  }
+
+  // Show ongoing appointment dialog
+  Future<void> showOngoingAppointmentDialog(BuildContext context, String serviceType) async {
+    String message = 'You already have an ongoing appointment. ';
+    String currentService = ongoingAppointment['service_type']?.toString().toLowerCase() ?? 'service';
+
+    if (currentService == serviceType.toLowerCase()) {
+      message = 'You already have an ongoing $currentService appointment. ';
+    } else {
+      message = 'You already have an ongoing $currentService appointment. ';
+    }
+
+    message += 'Please complete or cancel your existing appointment before booking a new one.';
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Ongoing Appointment'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Navigate to appointments screen
+              // Get.to(() => UserAppointmentsScreen());
+            },
+            child: Text('View Appointments'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadUserData() async {
@@ -317,6 +453,15 @@ class HomeController extends GetxController {
 
   Future<void> onServiceSelected(String serviceType, BuildContext context) async {
     debugPrint('[HomeController] Service selected: $serviceType');
+
+    // Check if user can book this service
+    final canBook = await canBookService(serviceType);
+    if (!canBook) {
+      // Show detailed dialog about ongoing appointment
+      await showOngoingAppointmentDialog(context, serviceType);
+      return;
+    }
+
     selectedServiceType.value = serviceType;
 
     // Show loading dialog
@@ -435,5 +580,10 @@ class HomeController extends GetxController {
 
   Future<void> refreshLocation() async {
     await fetchUserLocation();
+  }
+
+  // Refresh appointment status
+  Future<void> refreshAppointmentStatus() async {
+    await checkForPendingAppointments();
   }
 }

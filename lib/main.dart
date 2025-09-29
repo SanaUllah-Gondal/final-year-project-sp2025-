@@ -8,6 +8,7 @@ import 'package:plumber_project/pages/authentication/auth_service.dart';
 import 'package:plumber_project/pages/theme.dart';
 import 'package:plumber_project/routes/app_pages.dart';
 import 'package:plumber_project/services/api_service.dart';
+import 'package:plumber_project/services/firebas_service.dart';
 import 'package:plumber_project/services/storage_service.dart';
 import '../../../app_binding.dart';
 import '../../../controllers/theme_controller.dart';
@@ -202,6 +203,7 @@ Future<void> main() async {
     Get.put<NotificationService>(notificationService, permanent: true);
     Get.put<ApiService>(ApiService(), permanent: true);
     Get.put<AuthService>(AuthService(), permanent: true);
+    Get.put(FirebaseService());
 
     // Initialize controllers
     debugPrint('Initializing controllers...');

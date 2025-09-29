@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -164,6 +165,7 @@ class ApiService extends GetxService {
       rethrow;
     }
   }
+
   Future<Map<String, dynamic>> getCleanerAppointments() async {
     StorageService _storageService = Get.find();
     final token = await _storageService.getToken();
@@ -277,6 +279,7 @@ class ApiService extends GetxService {
       };
     }
   }
+
   Future<Map<String, dynamic>> getElectricianAppointments() async {
     StorageService _storageService = Get.find();
     final token = await _storageService.getToken();
@@ -333,6 +336,179 @@ class ApiService extends GetxService {
       };
     }
   }
+
+  // Check if user has ongoing appointments using existing methods
+  Future<Map<String, dynamic>> checkOngoingAppointments(String serviceType) async {
+    try {
+      _log('Checking ongoing appointments for: $serviceType');
+
+      // Get appointments for all service types
+      final List<Future<Map<String, dynamic>>> futures = [
+        getCleanerAppointments(),
+        getPlumberAppointments(),
+        getElectricianAppointments(),
+      ];
+
+      final results = await Future.wait(futures);
+
+      // Check for pending/confirmed appointments in the specified service type
+      for (var result in results) {
+        if (result['success'] == true && result['data'] != null) {
+          // Handle both List and Map response formats
+          List<Map<String, dynamic>> appointments = [];
+
+          if (result['data'] is List) {
+            // If data is already a List
+            appointments = List<Map<String, dynamic>>.from(result['data'] ?? []);
+          } else if (result['data'] is Map) {
+            // If data is a Map, check if it contains a 'data' key or use the map itself
+            final dataMap = result['data'] as Map<String, dynamic>;
+            if (dataMap['data'] is List) {
+              appointments = List<Map<String, dynamic>>.from(dataMap['data'] ?? []);
+            } else {
+              // If it's a single appointment map, wrap it in a list
+              appointments = [dataMap];
+            }
+          }
+
+          for (var appointment in appointments) {
+            final status = appointment['status']?.toString().toLowerCase();
+            final appointmentServiceType = _getAppointmentServiceType(appointment, result);
+
+            // Check if this appointment matches the service type and has ongoing status
+            if (appointmentServiceType.toLowerCase() == serviceType.toLowerCase() &&
+                (status == 'pending' || status == 'confirmed' || status == 'accepted')) {
+              return {
+                'success': true,
+                'hasOngoing': true,
+                'appointment': appointment,
+                'message': 'You have an ongoing $serviceType appointment'
+              };
+            }
+          }
+        }
+      }
+
+      return {
+        'success': true,
+        'hasOngoing': false,
+        'message': 'No ongoing appointments found'
+      };
+    } catch (e) {
+      _log('Check ongoing appointments error: $e');
+      return {
+        'success': false,
+        'hasOngoing': false,
+        'message': 'Error checking appointments: $e'
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> getUserAppointments() async {
+    try {
+      _log('Getting all user appointments');
+
+      final List<Future<Map<String, dynamic>>> futures = [
+        getCleanerAppointments(),
+        getPlumberAppointments(),
+        getElectricianAppointments(),
+      ];
+
+      final results = await Future.wait(futures);
+
+      List<Map<String, dynamic>> allAppointments = [];
+
+      for (var result in results) {
+        if (result['success'] == true && result['data'] != null) {
+          // Handle the pagination structure - extract the actual appointments list
+          final data = result['data'];
+          List<dynamic> appointmentsData = [];
+
+          if (data is Map<String, dynamic>) {
+            // This is the pagination structure with 'data' field containing the list
+            appointmentsData = data['data'] ?? [];
+          } else if (data is List) {
+            // This is already a list
+            appointmentsData = data;
+          }
+
+          // Convert to List<Map<String, dynamic>>
+          final appointments = List<Map<String, dynamic>>.from(
+              appointmentsData.whereType<Map<String, dynamic>>()
+          );
+
+          // Add service type to each appointment
+          for (var appointment in appointments) {
+            appointment['service_type'] = _getAppointmentServiceType(appointment, result);
+            allAppointments.add(appointment);
+          }
+        }
+      }
+
+      // Sort by date (newest first)
+      allAppointments.sort((a, b) {
+        try {
+          final dateA = DateTime.parse(a['appointment_date'] ?? a['created_at'] ?? DateTime.now().toString());
+          final dateB = DateTime.parse(b['appointment_date'] ?? b['created_at'] ?? DateTime.now().toString());
+          return dateB.compareTo(dateA);
+        } catch (e) {
+          return 0;
+        }
+      });
+
+      return {
+        'success': true,
+        'data': allAppointments,
+        'message': 'Appointments loaded successfully'
+      };
+    } catch (e) {
+      _log('Get user appointments error: $e');
+      return {
+        'success': false,
+        'data': [],
+        'message': 'Error loading appointments: $e'
+      };
+    }
+  }
+
+// Check if user has any pending appointments across all services
+  Future<bool> hasPendingAppointments() async {
+    try {
+      final response = await getUserAppointments();
+      if (response['success'] == true) {
+        final appointments = List<Map<String, dynamic>>.from(response['data'] ?? []);
+        return appointments.any((appointment) {
+          final status = appointment['status']?.toString().toLowerCase();
+          return status == 'pending' || status == 'confirmed' || status == 'accepted';
+        });
+      }
+      return false;
+    } catch (e) {
+      _log('Has pending appointments error: $e');
+      return false;
+    }
+  }
+  // Helper method to determine service type from appointment data
+  String _getAppointmentServiceType(Map<String, dynamic> appointment, Map<String, dynamic> result) {
+    // Try to get from appointment data first
+    if (appointment['service_type'] != null) {
+      return appointment['service_type'].toString();
+    }
+
+    // Try to determine from result data
+    final requestUrl = result.toString().toLowerCase();
+    if (requestUrl.contains('cleaner')) return 'cleaner';
+    if (requestUrl.contains('plumber')) return 'plumber';
+    if (requestUrl.contains('electrician')) return 'electrician';
+
+    // Default based on appointment data structure
+    if (appointment['cleaner_id'] != null) return 'cleaner';
+    if (appointment['plumber_id'] != null) return 'plumber';
+    if (appointment['electrician_id'] != null) return 'electrician';
+
+    return 'unknown';
+  }
+
   bool _isHtml(String responseBody) {
     final trimmed = responseBody.trim();
     return trimmed.startsWith('<!DOCTYPE html') ||
@@ -342,6 +518,41 @@ class ApiService extends GetxService {
         trimmed.contains('<title') ||
         trimmed.startsWith('HTTP') ||
         trimmed.contains('<!DOCTYPE HTML');
+  }
+
+
+  Future<Map<String, dynamic>> completeAppointmentWithPayment(
+      String serviceType,
+      String appointmentId,
+      String paymentMethod,
+      double amount,
+      ) async {
+    try {
+      final dio = Dio();
+      final response = await dio.post(
+        '/$serviceType/appointments/$appointmentId/complete',
+        data: {
+          'payment_method': paymentMethod,
+          'amount': amount,
+          'completed_at': DateTime.now().toIso8601String(),
+        },
+      );
+
+      return {
+        'success': true,
+        'data': response.data,
+      };
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'message': e.response?.data?['message'] ?? 'Failed to complete appointment',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+      };
+    }
   }
   Future<Map<String, dynamic>> updateAppointmentStatus(
       String serviceType,
@@ -585,7 +796,7 @@ class ApiService extends GetxService {
     }
   }
 
-  // Get user email (if needed separately)
+  // Get user email
   Future<String?> getUserEmail() async {
     try {
       final userData = await getMe();
@@ -595,6 +806,7 @@ class ApiService extends GetxService {
       return null;
     }
   }
+
   Future<Map<String, dynamic>> cancelAppointment(String serviceType, String appointmentId) async {
     return await post('/api/$serviceType-appointments/$appointmentId/cancel');
   }

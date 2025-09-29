@@ -529,7 +529,7 @@ class PlumberProfileController extends GetxController {
 
       // Save to Firestore
       await firestore
-          .collection('plumbers')
+          .collection('plumber')
           .doc(user.uid)
           .set(plumberData, SetOptions(merge: true));
 

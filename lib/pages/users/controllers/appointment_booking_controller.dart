@@ -332,7 +332,7 @@ class AppointmentBookingController extends GetxController {
     try {
       print('🔥 Starting Firebase save...');
 
-      String collectionName = '${serviceType.toLowerCase()}_appointments';
+      String collectionName = '${serviceType.toLowerCase()}_appointment';
       print('📁 Firebase collection: $collectionName');
 
       // Prepare image data
