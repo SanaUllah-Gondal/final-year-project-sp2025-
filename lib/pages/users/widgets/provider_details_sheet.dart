@@ -55,7 +55,7 @@ class _ProviderDetailsSheetState extends State<ProviderDetailsSheet> {
       String collectionName;
       switch (providerType.toLowerCase()) {
         case 'plumber':
-          collectionName = 'plumbers';
+          collectionName = 'plumber';
           break;
         case 'electrician':
           collectionName = 'electrician';

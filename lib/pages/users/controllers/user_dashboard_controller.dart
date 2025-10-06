@@ -25,7 +25,8 @@ class HomeController extends GetxController {
   var profileImage = ''.obs;
   var deviceToken = ''.obs;
   var userId = 0.obs;
-  final NotificationService notificationService = Get.find<NotificationService>();
+  final NotificationService notificationService = Get.find<
+      NotificationService>();
   final StorageService _storageService = Get.find<StorageService>();
   final ApiService _apiService = Get.find<ApiService>();
 
@@ -62,13 +63,18 @@ class HomeController extends GetxController {
   List<Map<String, dynamic>> services = [
     {"icon": Icons.cleaning_services, "title": "Cleaner", "type": "cleaner"},
     {"icon": Icons.tap_and_play, "title": "Plumber", "type": "plumber"},
-    {"icon": Icons.electrical_services, "title": "Electrician", "type": "electrician"},
+    {
+      "icon": Icons.electrical_services,
+      "title": "Electrician",
+      "type": "electrician"
+    },
   ];
 
   @override
   void onInit() {
     super.onInit();
     _initializeController();
+    refreshAppointmentStatus();
   }
 
   @override
@@ -110,7 +116,8 @@ class HomeController extends GetxController {
       final response = await _apiService.getUserAppointments();
 
       if (response['success'] == true) {
-        final appointments = List<Map<String, dynamic>>.from(response['data'] ?? []);
+        final appointments = List<Map<String, dynamic>>.from(
+            response['data'] ?? []);
         allUserAppointments.assignAll(appointments);
 
         // Check if there are any pending or confirmed appointments
@@ -126,7 +133,8 @@ class HomeController extends GetxController {
           ongoingAppointment.value = pendingAppointments.first;
         }
 
-        debugPrint('[HomeController] Found ${pendingAppointments.length} pending appointments');
+        debugPrint('[HomeController] Found ${pendingAppointments
+            .length} pending appointments');
       }
     } catch (e) {
       debugPrint('[HomeController] Error checking pending appointments: $e');
@@ -136,13 +144,17 @@ class HomeController extends GetxController {
   }
 
   // Enhanced appointment checking methods
-  Future<Map<String, dynamic>> checkOngoingAppointmentsForService(String serviceType) async {
+  Future<Map<String, dynamic>> checkOngoingAppointmentsForService(
+      String serviceType) async {
     try {
-      debugPrint('[HomeController] Checking ongoing appointments for: $serviceType');
+      debugPrint(
+          '[HomeController] Checking ongoing appointments for: $serviceType');
 
       // First check local pending appointments
       if (hasPendingAppointments.value && ongoingAppointment.isNotEmpty) {
-        final currentService = ongoingAppointment['service_type']?.toString().toLowerCase() ?? '';
+        final currentService = ongoingAppointment['service_type']
+            ?.toString()
+            .toLowerCase() ?? '';
         if (currentService == serviceType.toLowerCase()) {
           return {
             'hasOngoing': true,
@@ -172,7 +184,9 @@ class HomeController extends GetxController {
 
       // First check local pending appointments
       if (hasPendingAppointments.value) {
-        final currentService = ongoingAppointment['service_type']?.toString().toLowerCase() ?? '';
+        final currentService = ongoingAppointment['service_type']
+            ?.toString()
+            .toLowerCase() ?? '';
         if (currentService.isNotEmpty) {
           return false;
         }
@@ -193,9 +207,12 @@ class HomeController extends GetxController {
   }
 
   // Show ongoing appointment dialog
-  Future<void> showOngoingAppointmentDialog(BuildContext context, String serviceType) async {
+  Future<void> showOngoingAppointmentDialog(BuildContext context,
+      String serviceType) async {
     String message = 'You already have an ongoing appointment. ';
-    String currentService = ongoingAppointment['service_type']?.toString().toLowerCase() ?? 'service';
+    String currentService = ongoingAppointment['service_type']
+        ?.toString()
+        .toLowerCase() ?? 'service';
 
     if (currentService == serviceType.toLowerCase()) {
       message = 'You already have an ongoing $currentService appointment. ';
@@ -203,28 +220,30 @@ class HomeController extends GetxController {
       message = 'You already have an ongoing $currentService appointment. ';
     }
 
-    message += 'Please complete or cancel your existing appointment before booking a new one.';
+    message +=
+    'Please complete or cancel your existing appointment before booking a new one.';
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Ongoing Appointment'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('OK'),
+      builder: (context) =>
+          AlertDialog(
+            title: Text('Ongoing Appointment'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('OK'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  // Navigate to appointments screen
+                  // Get.to(() => UserAppointmentsScreen());
+                },
+                child: Text('View Appointments'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Navigate to appointments screen
-              // Get.to(() => UserAppointmentsScreen());
-            },
-            child: Text('View Appointments'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -240,7 +259,8 @@ class HomeController extends GetxController {
       phoneNumber.value = storedPhoneNumber ?? '';
       profileImage.value = storedProfileImage ?? '';
 
-      debugPrint('[HomeController] User data loaded - Email: ${userEmail.value}');
+      debugPrint(
+          '[HomeController] User data loaded - Email: ${userEmail.value}');
     } catch (e) {
       debugPrint('Error loading user data: $e');
     }
@@ -262,7 +282,6 @@ class HomeController extends GetxController {
 
       // Save token to Firebase
       await saveDeviceToken();
-
     } catch (e) {
       debugPrint('[HomeController] Error initializing device token: $e');
     }
@@ -286,7 +305,8 @@ class HomeController extends GetxController {
       }
 
       final FirebaseFirestore firestore = FirebaseFirestore.instance;
-      final CollectionReference tokensCollection = firestore.collection('userTokens');
+      final CollectionReference tokensCollection = firestore.collection(
+          'userTokens');
 
       // Use email as document ID for easier management
       await tokensCollection.doc(email).set({
@@ -330,7 +350,9 @@ class HomeController extends GetxController {
       );
 
       userCoordinates.value = position;
-      debugPrint('[HomeController] Got coordinates: ${position.latitude}, ${position.longitude}');
+      debugPrint(
+          '[HomeController] Got coordinates: ${position.latitude}, ${position
+              .longitude}');
 
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
@@ -349,7 +371,6 @@ class HomeController extends GetxController {
       userLocation.value = address;
       selectedLocation.value = address;
       debugPrint('[HomeController] Address: $address');
-
     } catch (e) {
       debugPrint('[HomeController] Error getting location: $e');
       userLocation.value = 'Error getting location: $e';
@@ -360,7 +381,8 @@ class HomeController extends GetxController {
 
   Future<void> getNearbyProviders(String serviceType) async {
     try {
-      debugPrint('[HomeController] Fetching nearby providers for: $serviceType');
+      debugPrint(
+          '[HomeController] Fetching nearby providers for: $serviceType');
       isLoadingProviders.value = true;
       apiError.value = '';
 
@@ -389,7 +411,8 @@ class HomeController extends GetxController {
         debugPrint('[HomeController] Parsed data: $data');
 
         if (data['success'] == true) {
-          final providers = List<Map<String, dynamic>>.from(data['providers'] ?? []);
+          final providers = List<Map<String, dynamic>>.from(
+              data['providers'] ?? []);
           debugPrint('[HomeController] Found ${providers.length} providers');
 
           if (providers.isNotEmpty) {
@@ -438,7 +461,8 @@ class HomeController extends GetxController {
                   leading: Icon(service['icon'], color: Colors.blue),
                   title: Text(service['title']),
                   onTap: () {
-                    debugPrint('[HomeController] Selected service: ${service['type']}');
+                    debugPrint(
+                        '[HomeController] Selected service: ${service['type']}');
                     Navigator.pop(context);
                     onServiceSelected(service['type'], context);
                   },
@@ -451,16 +475,14 @@ class HomeController extends GetxController {
     );
   }
 
-  Future<void> onServiceSelected(String serviceType, BuildContext context) async {
+  Future<void> onServiceSelected(String serviceType,
+      BuildContext context) async {
     debugPrint('[HomeController] Service selected: $serviceType');
 
-    // Check if user can book this service
-    final canBook = await canBookService(serviceType);
-    if (!canBook) {
+
       // Show detailed dialog about ongoing appointment
       await showOngoingAppointmentDialog(context, serviceType);
-      return;
-    }
+
 
     selectedServiceType.value = serviceType;
 
@@ -468,7 +490,8 @@ class HomeController extends GetxController {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const AlertDialog(
+      builder: (context) =>
+      const AlertDialog(
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -489,26 +512,29 @@ class HomeController extends GetxController {
       // Show error dialog if no providers found
       showDialog(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('No Providers Found'),
-          content: Text(apiError.value.isNotEmpty
-              ? apiError.value
-              : 'No ${serviceType.capitalizeFirst} providers available in your area.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
+        builder: (context) =>
+            AlertDialog(
+              title: const Text('No Providers Found'),
+              content: Text(apiError.value.isNotEmpty
+                  ? apiError.value
+                  : 'No ${serviceType
+                  .capitalizeFirst} providers available in your area.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
             ),
-          ],
-        ),
       );
     } else {
       // Navigate to map screen if providers found
-      Get.to(() => MapScreen(
-        serviceType: serviceType,
-        userLocation: userCoordinates.value,
-        providers: nearbyProviders.toList(),
-      ));
+      Get.to(() =>
+          MapScreen(
+            serviceType: serviceType,
+            userLocation: userCoordinates.value,
+            providers: nearbyProviders.toList(),
+          ));
     }
   }
 
@@ -586,4 +612,5 @@ class HomeController extends GetxController {
   Future<void> refreshAppointmentStatus() async {
     await checkForPendingAppointments();
   }
+
 }

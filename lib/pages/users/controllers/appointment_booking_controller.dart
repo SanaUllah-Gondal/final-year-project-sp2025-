@@ -409,7 +409,7 @@ class AppointmentBookingController extends GetxController {
       };
 
       print('📨 Sending notification via API...');
-      await SendNotificationService.sendNotificationUsingApi(
+      await SendNotificationService.sendNotification(
         token: providerToken,
         title: '📅 New Appointment Request',
         body: '$userName booked a $appointmentType $serviceType appointment on $formattedDate',

@@ -11,11 +11,15 @@ import 'package:plumber_project/pages/electrition/electrition_dashboard.dart';
 import 'package:plumber_project/pages/electrition/electrition_profile.dart';
 import 'package:plumber_project/pages/plumber/plumber_dashboard.dart';
 import 'package:plumber_project/pages/plumber/plumber_profile.dart';
+import 'package:plumber_project/pages/plumber/plumberrequest.dart';
 import 'package:plumber_project/pages/setting.dart';
 import 'package:plumber_project/pages/users/dashboard.dart';
 import 'package:plumber_project/pages/users/profile.dart';
 
 import '../pages/authentication/auth_service.dart';
+import '../pages/cleaner/cleaner_appointment_list.dart';
+import '../pages/electrition/electrician_appointment_list.dart';
+import '../pages/plumber/plumber_appointment_list.dart';
 import '../pages/users/user_profile.dart';
 import '../services/storage_service.dart';
 
@@ -26,6 +30,9 @@ abstract class AppRoutes {
   static const HOME = '/user/dashboard';
   static const USER_PROFILE = '/user/profile';
   static const SETTINGS = '/settings';
+  static const PlumberAppointments = '/plumber/plumber_appointment_list';
+  static const ElectricianAppointments = '/electrician/electrician_appointment_list';
+  static const CleanerAppointments = '/cleaner/cleaner_appointment_list';
   static const PLUMBER_DASHBOARD = '/plumber/dashboard';
   static const PLUMBER_PROFILE = '/plumber/profile';
   static const ELECTRICIAN_DASHBOARD = '/electrician/dashboard';
@@ -96,6 +103,18 @@ class AppPages {
     GetPage(
       name: AppRoutes.SETTINGS,
       page: () => SettingsScreen(),
+    ),
+    GetPage(
+      name: AppRoutes.CleanerAppointments,
+      page: () => CleanerAppointmentList(),
+    ),
+    GetPage(
+      name: AppRoutes.PlumberAppointments,
+      page: () => PlumberAppointmentList(),
+    ),
+    GetPage(
+      name: AppRoutes.ElectricianAppointments,
+      page: () => ElectricianAppointmentList(),
     ),
   ];
 }

@@ -1,4 +1,6 @@
+// notification_wrapper.dart
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'notification_service.dart';
 
 class NotificationWrapper extends StatefulWidget {
@@ -11,35 +13,19 @@ class NotificationWrapper extends StatefulWidget {
 }
 
 class _NotificationWrapperState extends State<NotificationWrapper> {
-  final NotificationService _notificationService = NotificationService();
+  final NotificationService _notificationService = Get.find<NotificationService>();
 
   @override
   void initState() {
     super.initState();
-
-    _setupNotificationListeners();
+    _setupNotificationContext();
   }
 
-
-
-  void _setupNotificationListeners() {
-    // Foreground messages
-    // FirebaseMessaging.onMessage.listen((message) {
-    //   _notificationService.handleForegroundMessage(message);
-    // });
-    //
-    // // Background messages
-    // FirebaseMessaging.onMessageOpenedApp.listen((message) {
-    //   _notificationService.handleBackgroundMessage(message);
-    // });
-    //
-    // // Terminated state messages
-    // FirebaseMessaging.instance.getInitialMessage().then((message) {
-    //   if (message != null) {
-    //     _notificationService.handleBackgroundMessage(message);
-    //   }
-    // });
-   }
+  void _setupNotificationContext() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _notificationService.setContext(context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

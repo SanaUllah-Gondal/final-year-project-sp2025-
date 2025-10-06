@@ -87,7 +87,7 @@ class _MapScreenState extends State<MapScreen> {
       String collectionName;
       switch (providerType.toLowerCase()) {
         case 'plumber':
-          collectionName = 'plumbers';
+          collectionName = 'plumber';
           break;
         case 'electrician':
           collectionName = 'electrician';

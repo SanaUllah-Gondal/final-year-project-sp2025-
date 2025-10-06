@@ -7,9 +7,10 @@ String getBaseUrl() {
   } else if (kDebugMode) {
     // Check if we're on a physical device
     if (_isPhysicalDevice()) {
-      return 'http://192.168.100.26:8000'; // Your computer's IP
+      return 'http://192.168.100.44:8000'; // Your computer's IP
     } else {
       // Emulator/Simulator
+      return 'http://10.0.2.2:8000';
       if (Platform.isAndroid) {
         return 'http://10.0.2.2:8000'; // Android emulator
       } else if (Platform.isIOS) {
@@ -18,7 +19,7 @@ String getBaseUrl() {
     }
   }
   // Production or fallback
-  return 'http://192.168.100.26:8000';
+  return 'http://192.168.100.44:8000';
 }
 
 bool _isPhysicalDevice() {

@@ -15,6 +15,7 @@ import '../../../controllers/theme_controller.dart';
 import '../../../firebase_options.dart';
 import '../../../notification/fcm_service.dart';
 import '../../../notification/notification_service.dart';
+import 'notification/notification_wraper.dart';
 
 
 
@@ -22,10 +23,16 @@ import '../../../notification/notification_service.dart';
 Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    // Handle background notification
-    await NotificationService().showNotification(message);
+
+    // Initialize notification service for background
+    final notificationService = NotificationService();
+    await notificationService.initLocalNotifications();
+    await notificationService.showNotification(message);
+
+
+    debugPrint('✅ Background notification handled successfully');
   } catch (e) {
-    debugPrint('Background handler error: $e');
+    debugPrint('❌ Background handler error: $e');
   }
 }
 
@@ -237,7 +244,6 @@ Future<void> main() async {
     _runErrorApp(e, st);
   }
 }
-
 class MyApp extends StatefulWidget {
   final String initialRoute;
   const MyApp({Key? key, required this.initialRoute}) : super(key: key);
@@ -246,23 +252,44 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeApp();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    // Handle app lifecycle changes for notifications
+    if (state == AppLifecycleState.resumed) {
+      _updateNotificationContext();
+    }
   }
 
   void _initializeApp() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      try {
-        final notificationService = Get.find<NotificationService>();
-        notificationService.setContext(context);
-        debugPrint('Notification context set successfully');
-      } catch (e) {
-        debugPrint('Error setting notification context: $e');
-      }
+      _updateNotificationContext();
     });
+  }
+
+  void _updateNotificationContext() {
+    try {
+      final notificationService = Get.find<NotificationService>();
+      notificationService.setContext(context);
+      debugPrint('✅ Notification context updated');
+    } catch (e) {
+      debugPrint('⚠️ Error updating notification context: $e');
+    }
   }
 
   @override
@@ -279,13 +306,7 @@ class _MyAppState extends State<MyApp> {
       defaultTransition: Transition.fadeIn,
       navigatorObservers: [GetObserver()],
       builder: (context, child) {
-        return GestureDetector(
-          onTap: () {
-            // Hide keyboard when tapping outside
-            FocusScope.of(context).requestFocus(FocusNode());
-          },
-          child: child,
-        );
+        return NotificationWrapper(child: child!);
       },
     );
   }
@@ -294,7 +315,7 @@ class _MyAppState extends State<MyApp> {
     try {
       return Get.find<ThemeController>().themeMode;
     } catch (e) {
-      debugPrint('Error getting theme mode: $e');
+      debugPrint('⚠️ Error getting theme mode: $e');
       return ThemeMode.system;
     }
   }

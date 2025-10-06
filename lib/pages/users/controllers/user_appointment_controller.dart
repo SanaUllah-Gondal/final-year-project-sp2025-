@@ -550,7 +550,7 @@ class UserAppointmentsController extends GetxController {
       };
 
       // Send notification
-      await SendNotificationService.sendNotificationUsingApi(
+      await SendNotificationService.sendNotification(
         token: providerToken,
         title: message['title']!,
         body: message['body']!,
