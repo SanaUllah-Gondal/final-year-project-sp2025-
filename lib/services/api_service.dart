@@ -337,7 +337,7 @@ class ApiService extends GetxService {
     }
   }
 
-  // Check if user has ongoing appointments using existing methods
+// Check if user has ongoing appointments using existing methods
   Future<Map<String, dynamic>> checkOngoingAppointments(String serviceType) async {
     try {
       _log('Checking ongoing appointments for: $serviceType');
@@ -354,14 +354,12 @@ class ApiService extends GetxService {
       // Check for pending/confirmed appointments in the specified service type
       for (var result in results) {
         if (result['success'] == true && result['data'] != null) {
-          // Handle both List and Map response formats
           List<Map<String, dynamic>> appointments = [];
 
+          // Parse appointments based on response format
           if (result['data'] is List) {
-            // If data is already a List
             appointments = List<Map<String, dynamic>>.from(result['data'] ?? []);
           } else if (result['data'] is Map) {
-            // If data is a Map, check if it contains a 'data' key or use the map itself
             final dataMap = result['data'] as Map<String, dynamic>;
             if (dataMap['data'] is List) {
               appointments = List<Map<String, dynamic>>.from(dataMap['data'] ?? []);
@@ -371,6 +369,7 @@ class ApiService extends GetxService {
             }
           }
 
+          // Check each appointment for matching service type and ongoing status
           for (var appointment in appointments) {
             final status = appointment['status']?.toString().toLowerCase();
             final appointmentServiceType = _getAppointmentServiceType(appointment, result);
@@ -378,21 +377,25 @@ class ApiService extends GetxService {
             // Check if this appointment matches the service type and has ongoing status
             if (appointmentServiceType.toLowerCase() == serviceType.toLowerCase() &&
                 (status == 'pending' || status == 'confirmed' || status == 'accepted')) {
+              _log('Found ongoing $serviceType appointment with status: $status');
               return {
                 'success': true,
                 'hasOngoing': true,
                 'appointment': appointment,
-                'message': 'You have an ongoing $serviceType appointment'
+                'serviceType': serviceType,
+                'status': status,
+                'message': 'You have an ongoing $serviceType appointment (Status: ${status?.toUpperCase()})'
               };
             }
           }
         }
       }
 
+      _log('No ongoing $serviceType appointments found');
       return {
         'success': true,
         'hasOngoing': false,
-        'message': 'No ongoing appointments found'
+        'message': 'No ongoing $serviceType appointments found'
       };
     } catch (e) {
       _log('Check ongoing appointments error: $e');
@@ -403,7 +406,6 @@ class ApiService extends GetxService {
       };
     }
   }
-
   Future<Map<String, dynamic>> getUserAppointments() async {
     try {
       _log('Getting all user appointments');

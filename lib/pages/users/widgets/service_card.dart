@@ -4,21 +4,18 @@ import 'package:get/get.dart';
 class ServiceCard extends StatelessWidget {
   final Map<String, dynamic> service;
   final VoidCallback onTap;
-  final bool hasOngoingAppointment;
-  final String? ongoingServiceType;
+  final List<String> pendingServices;
 
   const ServiceCard({
     Key? key,
     required this.service,
     required this.onTap,
-    this.hasOngoingAppointment = false,
-    this.ongoingServiceType, required RxList<String> pendingServices,
+    required this.pendingServices,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final isBlocked = hasOngoingAppointment &&
-        ongoingServiceType?.toLowerCase() == service['type'].toLowerCase();
+    final isBlocked = pendingServices.contains(service['type']);
 
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -122,18 +119,35 @@ class ServiceCard extends StatelessWidget {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(
-                                  Icons.lock_clock,
-                                  color: Colors.white,
-                                  size: 32,
+                                Container(
+                                  padding: EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.lock_clock,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
                                 ),
-                                SizedBox(height: 8),
+                                SizedBox(height: 12),
                                 Text(
                                   'Service in Progress',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w600,
+                                    fontSize: 16,
                                   ),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  'Complete existing request\nto book again',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontSize: 12,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
                               ],
                             ),

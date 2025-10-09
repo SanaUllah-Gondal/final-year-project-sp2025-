@@ -13,6 +13,7 @@ import '../../../notification/fcm_service.dart';
 import '../../../notification/notification_service.dart';
 import '../../../services/api_service.dart';
 import '../../../services/storage_service.dart';
+import '../appointments_screen.dart';
 import '../profile.dart';
 import '../../emergency.dart';
 
@@ -25,8 +26,7 @@ class HomeController extends GetxController {
   var profileImage = ''.obs;
   var deviceToken = ''.obs;
   var userId = 0.obs;
-  final NotificationService notificationService = Get.find<
-      NotificationService>();
+  final NotificationService notificationService = Get.find<NotificationService>();
   final StorageService _storageService = Get.find<StorageService>();
   final ApiService _apiService = Get.find<ApiService>();
 
@@ -52,21 +52,37 @@ class HomeController extends GetxController {
   var isLoadingProviders = false.obs;
   var apiError = ''.obs;
 
-  // New variables for appointment checking
+  // Enhanced appointment checking variables
   var hasPendingAppointments = false.obs;
-  var ongoingAppointment = <String, dynamic>{}.obs;
+  var ongoingAppointments = <Map<String, dynamic>>[].obs;
   var isLoadingAppointments = false.obs;
   var allUserAppointments = <Map<String, dynamic>>[].obs;
+  var pendingServices = <String>[].obs; // Track which services have pending appointments
 
+  Timer? _appointmentTimer;
   final TextEditingController searchController = TextEditingController();
 
   List<Map<String, dynamic>> services = [
-    {"icon": Icons.cleaning_services, "title": "Cleaner", "type": "cleaner"},
-    {"icon": Icons.tap_and_play, "title": "Plumber", "type": "plumber"},
+    {
+      "icon": Icons.cleaning_services,
+      "title": "Professional Cleaning",
+      "type": "cleaner",
+      "description": "Spotless cleaning services for your home or office",
+      "color": Color(0xFF4CAF50)
+    },
+    {
+      "icon": Icons.plumbing,
+      "title": "Expert Plumbing",
+      "type": "plumber",
+      "description": "Fix leaks, installations, and plumbing emergencies",
+      "color": Color(0xFF2196F3)
+    },
     {
       "icon": Icons.electrical_services,
-      "title": "Electrician",
-      "type": "electrician"
+      "title": "Electrical Solutions",
+      "type": "electrician",
+      "description": "Wiring, repairs, and electrical safety checks",
+      "color": Color(0xFFFF9800)
     },
   ];
 
@@ -74,53 +90,50 @@ class HomeController extends GetxController {
   void onInit() {
     super.onInit();
     _initializeController();
-    refreshAppointmentStatus();
+    _startAppointmentTimer();
   }
 
   @override
   void onClose() {
+    _appointmentTimer?.cancel();
     searchController.dispose();
     super.onClose();
+  }
+
+  void _startAppointmentTimer() {
+    // Check appointments every 5 seconds
+    _appointmentTimer = Timer.periodic(Duration(seconds: 5), (timer) {
+      if (!isLoadingAppointments.value) {
+        checkForPendingAppointments();
+      }
+    });
   }
 
   Future<void> _initializeController() async {
     try {
       debugPrint('[HomeController] Initializing...');
-
-      // Load user data first
       await _loadUserData();
-
-      // Initialize services
       filteredServices.assignAll(services);
-
-      // Get device token and save it
       await _initializeDeviceToken();
-
-      // Load other data
       await fetchUserLocation();
       await loadSavedLocations();
-
-      // Check for pending appointments
       await checkForPendingAppointments();
-
       debugPrint('[HomeController] Initialization complete');
     } catch (e) {
       debugPrint('[HomeController] Error during initialization: $e');
     }
   }
 
-  // Check for pending appointments periodically
+  // Enhanced appointment checking method
   Future<void> checkForPendingAppointments() async {
     try {
       isLoadingAppointments.value = true;
       final response = await _apiService.getUserAppointments();
 
       if (response['success'] == true) {
-        final appointments = List<Map<String, dynamic>>.from(
-            response['data'] ?? []);
+        final appointments = List<Map<String, dynamic>>.from(response['data'] ?? []);
         allUserAppointments.assignAll(appointments);
 
-        // Check if there are any pending or confirmed appointments
         final pendingAppointments = appointments.where((appointment) =>
         appointment['status'] == 'pending' ||
             appointment['status'] == 'confirmed' ||
@@ -128,13 +141,26 @@ class HomeController extends GetxController {
         ).toList();
 
         hasPendingAppointments.value = pendingAppointments.isNotEmpty;
+        ongoingAppointments.assignAll(pendingAppointments);
 
-        if (pendingAppointments.isNotEmpty) {
-          ongoingAppointment.value = pendingAppointments.first;
+        // Update pending services list
+        final servicesSet = <String>{};
+        for (var appointment in pendingAppointments) {
+          final serviceType = appointment['service_type']?.toString().toLowerCase() ?? 'unknown';
+          if (serviceType != 'unknown') {
+            servicesSet.add(serviceType);
+          }
+        }
+        pendingServices.assignAll(servicesSet.toList());
+
+        // Log all pending appointments
+        for (var appointment in pendingAppointments) {
+          final serviceType = appointment['service_type']?.toString() ?? 'unknown';
+          final status = appointment['status']?.toString() ?? 'unknown';
+          debugPrint('[HomeController] Pending appointment - Service: $serviceType, Status: $status');
         }
 
-        debugPrint('[HomeController] Found ${pendingAppointments
-            .length} pending appointments');
+        debugPrint('[HomeController] Found ${pendingAppointments.length} pending appointments across ${servicesSet.length} services: ${servicesSet.join(', ')}');
       }
     } catch (e) {
       debugPrint('[HomeController] Error checking pending appointments: $e');
@@ -143,110 +169,318 @@ class HomeController extends GetxController {
     }
   }
 
-  // Enhanced appointment checking methods
-  Future<Map<String, dynamic>> checkOngoingAppointmentsForService(
-      String serviceType) async {
-    try {
-      debugPrint(
-          '[HomeController] Checking ongoing appointments for: $serviceType');
-
-      // First check local pending appointments
-      if (hasPendingAppointments.value && ongoingAppointment.isNotEmpty) {
-        final currentService = ongoingAppointment['service_type']
-            ?.toString()
-            .toLowerCase() ?? '';
-        if (currentService == serviceType.toLowerCase()) {
-          return {
-            'hasOngoing': true,
-            'serviceType': currentService,
-            'appointment': ongoingAppointment,
-            'message': 'You already have an ongoing $currentService appointment'
-          };
-        }
-      }
-
-      // Then check with API
-      final response = await _apiService.checkOngoingAppointments(serviceType);
-      return response;
-    } catch (e) {
-      debugPrint('[HomeController] Error checking ongoing appointments: $e');
-      return {
-        'hasOngoing': false,
-        'message': 'Error checking appointments: $e'
-      };
-    }
-  }
-
-  // Check if user can book a new service
+  // Enhanced method to check if a specific service can be booked
   Future<bool> canBookService(String serviceType) async {
     try {
       debugPrint('[HomeController] Checking if can book $serviceType');
 
-      // First check local pending appointments
-      if (hasPendingAppointments.value) {
-        final currentService = ongoingAppointment['service_type']
-            ?.toString()
-            .toLowerCase() ?? '';
-        if (currentService.isNotEmpty) {
-          return false;
-        }
-      }
+      // Check if this service type has any pending appointments
+      final hasPendingForService = pendingServices.any((service) => service == serviceType.toLowerCase());
 
-      // Then check with API for specific service type
-      final response = await _apiService.checkOngoingAppointments(serviceType);
-
-      if (response['success'] == true && response['hasOngoing'] == true) {
+      if (hasPendingForService) {
+        debugPrint('[HomeController] Blocking booking - found pending appointments for service: $serviceType');
         return false;
       }
 
+      debugPrint('[HomeController] Allowing booking - no pending appointments for service: $serviceType');
       return true;
     } catch (e) {
       debugPrint('[HomeController] Error checking if can book service: $e');
-      return true; // Allow booking if there's an error in checking
+      return true; // Allow booking if there's an error
     }
   }
 
-  // Show ongoing appointment dialog
-  Future<void> showOngoingAppointmentDialog(BuildContext context,
-      String serviceType) async {
-    String message = 'You already have an ongoing appointment. ';
-    String currentService = ongoingAppointment['service_type']
-        ?.toString()
-        .toLowerCase() ?? 'service';
+  // Enhanced dialog to show all pending services
+  Future<void> showOngoingAppointmentDialog(BuildContext context, String serviceType) async {
+    final pendingForThisService = ongoingAppointments.where((appointment) {
+      final appointmentService = appointment['service_type']?.toString().toLowerCase() ?? '';
+      return appointmentService == serviceType.toLowerCase();
+    }).toList();
 
-    if (currentService == serviceType.toLowerCase()) {
-      message = 'You already have an ongoing $currentService appointment. ';
-    } else {
-      message = 'You already have an ongoing $currentService appointment. ';
+    if (pendingForThisService.isNotEmpty) {
+      final firstAppointment = pendingForThisService.first;
+      final appointmentStatus = firstAppointment['status']?.toString() ?? 'pending';
+      final count = pendingForThisService.length;
+
+      String message = 'You have $count ongoing $serviceType appointment${count > 1 ? 's' : ''} (Status: ${appointmentStatus.toUpperCase()}).\n\n';
+      message += 'Please complete or cancel your existing $serviceType appointment${count > 1 ? 's' : ''} before booking a new one.';
+
+      await _showModernDialog(
+        context,
+        title: 'Ongoing $serviceType Appointment${count > 1 ? 's' : ''}',
+        content: message,
+        actions: [
+          _DialogAction(
+            text: 'OK',
+            onPressed: () => Navigator.pop(context),
+            isPrimary: false,
+          ),
+          _DialogAction(
+            text: 'View Appointments',
+            onPressed: () {
+              Navigator.pop(context);
+              Get.to(() => UserAppointmentsScreen());
+            },
+            isPrimary: true,
+          ),
+        ],
+      );
     }
+  }
 
-    message +=
-    'Please complete or cancel your existing appointment before booking a new one.';
-
+  // Modern dialog method
+  Future<void> _showModernDialog(
+      BuildContext context, {
+        required String title,
+        required String content,
+        required List<_DialogAction> actions,
+      }) async {
     await showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: Text('Ongoing Appointment'),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('OK'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  // Navigate to appointments screen
-                  // Get.to(() => UserAppointmentsScreen());
-                },
-                child: Text('View Appointments'),
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.all(20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: Offset(0, 10),
               ),
             ],
           ),
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  content,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[700],
+                    height: 1.4,
+                  ),
+                ),
+                SizedBox(height: 24),
+                // Improved button layout with proper spacing
+                if (actions.length == 1)
+                  actions.first.build(), // Single button takes full width
+                if (actions.length > 1)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: actions[0].build(),
+                      ),
+                      SizedBox(width: 12), // Proper spacing between buttons
+                      Expanded(
+                        child: actions[1].build(),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  // Modern loading dialog
+  void showModernLoadingDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Color(0xFF667eea).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667eea)),
+                  strokeWidth: 3,
+                ),
+              ),
+              SizedBox(height: 20),
+              Text(
+                message,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Please wait while we find the best professionals...',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
+  // Modern no providers found dialog
+  void showModernNoProvidersDialog(BuildContext context, String serviceType, String errorMessage) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Color(0xFFFF6B6B).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.person_search,
+                  size: 40,
+                  color: Color(0xFFFF6B6B),
+                ),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'No Providers Available',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                errorMessage.isNotEmpty
+                    ? errorMessage
+                    : 'No ${serviceType.capitalizeFirst} providers are currently available in your area.',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[700],
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: _DialogAction(
+                      text: 'Try Again',
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onServiceSelected(serviceType, context);
+                      },
+                      isPrimary: true,
+                    ).build(),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: _DialogAction(
+                      text: 'OK',
+                      onPressed: () => Navigator.pop(context),
+                      isPrimary: false,
+                    ).build(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Updated service selection with modern loading
+  Future<void> onServiceSelected(String serviceType, BuildContext context) async {
+    debugPrint('[HomeController] Service selected: $serviceType');
+
+    // Check if user can book this specific service type
+    final canBook = await canBookService(serviceType);
+
+    if (!canBook) {
+      await showOngoingAppointmentDialog(context, serviceType);
+      return;
+    }
+
+    selectedServiceType.value = serviceType;
+
+    // Show modern loading dialog
+    showModernLoadingDialog(context, 'Finding Nearby Providers');
+
+    await getNearbyProviders(serviceType);
+
+    // Close loading dialog
+    Navigator.of(context).pop();
+
+    if (nearbyProviders.isEmpty) {
+      showModernNoProvidersDialog(context, serviceType, apiError.value);
+    } else {
+      Get.to(() => MapScreen(
+        serviceType: serviceType,
+        userLocation: userCoordinates.value,
+        providers: nearbyProviders.toList(),
+      ));
+    }
+  }
+
+  // Rest of your existing methods remain the same...
   Future<void> _loadUserData() async {
     try {
       final storedUserId = await _storageService.getUserId();
@@ -259,8 +493,7 @@ class HomeController extends GetxController {
       phoneNumber.value = storedPhoneNumber ?? '';
       profileImage.value = storedProfileImage ?? '';
 
-      debugPrint(
-          '[HomeController] User data loaded - Email: ${userEmail.value}');
+      debugPrint('[HomeController] User data loaded - Email: ${userEmail.value}');
     } catch (e) {
       debugPrint('Error loading user data: $e');
     }
@@ -269,18 +502,14 @@ class HomeController extends GetxController {
   Future<void> _initializeDeviceToken() async {
     try {
       debugPrint('[HomeController] Getting device token...');
-
-      // Get device token
       final token = await notificationService.getDeviceToken();
       deviceToken.value = token;
       debugPrint('[HomeController] Device token obtained: $token');
 
-      // Initialize FCM services
       FcmService.firebaseInit();
       notificationService.firebaseInit();
       notificationService.setupInteractMessage();
 
-      // Save token to Firebase
       await saveDeviceToken();
     } catch (e) {
       debugPrint('[HomeController] Error initializing device token: $e');
@@ -293,22 +522,14 @@ class HomeController extends GetxController {
       final token = deviceToken.value;
       final id = userId.value;
 
-      // Check if email and token are not empty
-      if (email.isEmpty) {
-        debugPrint('Email is empty, skipping token save');
-        return;
-      }
-
-      if (token.isEmpty) {
-        debugPrint('Device token is empty, skipping save');
+      if (email.isEmpty || token.isEmpty) {
+        debugPrint('Email or token is empty, skipping token save');
         return;
       }
 
       final FirebaseFirestore firestore = FirebaseFirestore.instance;
-      final CollectionReference tokensCollection = firestore.collection(
-          'userTokens');
+      final CollectionReference tokensCollection = firestore.collection('userTokens');
 
-      // Use email as document ID for easier management
       await tokensCollection.doc(email).set({
         'email': email,
         'deviceToken': token,
@@ -350,9 +571,7 @@ class HomeController extends GetxController {
       );
 
       userCoordinates.value = position;
-      debugPrint(
-          '[HomeController] Got coordinates: ${position.latitude}, ${position
-              .longitude}');
+      debugPrint('[HomeController] Got coordinates: ${position.latitude}, ${position.longitude}');
 
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
@@ -381,8 +600,7 @@ class HomeController extends GetxController {
 
   Future<void> getNearbyProviders(String serviceType) async {
     try {
-      debugPrint(
-          '[HomeController] Fetching nearby providers for: $serviceType');
+      debugPrint('[HomeController] Fetching nearby providers for: $serviceType');
       isLoadingProviders.value = true;
       apiError.value = '';
 
@@ -411,8 +629,7 @@ class HomeController extends GetxController {
         debugPrint('[HomeController] Parsed data: $data');
 
         if (data['success'] == true) {
-          final providers = List<Map<String, dynamic>>.from(
-              data['providers'] ?? []);
+          final providers = List<Map<String, dynamic>>.from(data['providers'] ?? []);
           debugPrint('[HomeController] Found ${providers.length} providers');
 
           if (providers.isNotEmpty) {
@@ -451,91 +668,58 @@ class HomeController extends GetxController {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Select Service Type'),
-          content: SingleChildScrollView(
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: services.map((service) {
-                return ListTile(
-                  leading: Icon(service['icon'], color: Colors.blue),
-                  title: Text(service['title']),
-                  onTap: () {
-                    debugPrint(
-                        '[HomeController] Selected service: ${service['type']}');
-                    Navigator.pop(context);
-                    onServiceSelected(service['type'], context);
-                  },
-                );
-              }).toList(),
+              children: [
+                Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    'Select Service Type',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                ...services.map((service) {
+                  return ListTile(
+                    leading: Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: service['color'].withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(service['icon'], color: service['color']),
+                    ),
+                    title: Text(
+                      service['title'],
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(service['description']),
+                    onTap: () {
+                      debugPrint('[HomeController] Selected service: ${service['type']}');
+                      Navigator.pop(context);
+                      onServiceSelected(service['type'], context);
+                    },
+                  );
+                }).toList(),
+                SizedBox(height: 16),
+              ],
             ),
           ),
         );
       },
     );
-  }
-
-  Future<void> onServiceSelected(String serviceType,
-      BuildContext context) async {
-    debugPrint('[HomeController] Service selected: $serviceType');
-
-
-      // Show detailed dialog about ongoing appointment
-      await showOngoingAppointmentDialog(context, serviceType);
-
-
-    selectedServiceType.value = serviceType;
-
-    // Show loading dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) =>
-      const AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Finding nearby providers...'),
-          ],
-        ),
-      ),
-    );
-
-    await getNearbyProviders(serviceType);
-
-    // Close loading dialog
-    Navigator.of(context).pop();
-
-    if (nearbyProviders.isEmpty) {
-      // Show error dialog if no providers found
-      showDialog(
-        context: context,
-        builder: (context) =>
-            AlertDialog(
-              title: const Text('No Providers Found'),
-              content: Text(apiError.value.isNotEmpty
-                  ? apiError.value
-                  : 'No ${serviceType
-                  .capitalizeFirst} providers available in your area.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-      );
-    } else {
-      // Navigate to map screen if providers found
-      Get.to(() =>
-          MapScreen(
-            serviceType: serviceType,
-            userLocation: userCoordinates.value,
-            providers: nearbyProviders.toList(),
-          ));
-    }
   }
 
   void toggleSearchBar() {
@@ -612,5 +796,40 @@ class HomeController extends GetxController {
   Future<void> refreshAppointmentStatus() async {
     await checkForPendingAppointments();
   }
+}
 
+/// Helper class for modern dialog actions
+class _DialogAction {
+  final String text;
+  final VoidCallback onPressed;
+  final bool isPrimary;
+
+  _DialogAction({
+    required this.text,
+    required this.onPressed,
+    required this.isPrimary,
+  });
+
+  Widget build() {
+    return Container(
+      height: 44,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isPrimary ? Color(0xFF667eea) : Colors.grey[300],
+          foregroundColor: isPrimary ? Colors.white : Colors.grey[700],
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
 }
