@@ -2,18 +2,17 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:photo_view/photo_view.dart';
-import 'package:plumber_project/pages/cleaner/controllers/cleaner_dashboard_controller.dart';
 import 'package:plumber_project/services/api_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
+import '../../notification/notification_helper.dart';
 import '../../widgets/app_color.dart';
 import '../../widgets/app_text_style.dart';
 import '../../widgets/custom_badge.dart';
 import '../../widgets/loading_shimmer.dart';
 import 'controllers/electrician_dashboard_controller.dart';
-
 
 class ElectricianAppointmentList extends StatefulWidget {
   @override
@@ -44,21 +43,14 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
   Future<void> _loadAppointments() async {
     try {
       _isLoading.value = true;
-      print('Loading cleaner appointments...');
+      print('Loading electrician appointments...');
 
       final response = await _apiService.getElectricianAppointments();
       print('Raw API response: $response');
-      print('Response type: ${response.runtimeType}');
 
       if (response['data'] != null) {
-        // Extract pagination object
         final paginationData = response['data'];
-        print('Pagination data type: ${paginationData.runtimeType}');
-
-        // Extract actual appointments list
         final appointmentsData = paginationData['data'];
-        print('Appointments data: $appointmentsData');
-        print('Appointments data type: ${appointmentsData.runtimeType}');
 
         if (appointmentsData is List) {
           _appointments.value = appointmentsData;
@@ -100,7 +92,7 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
 
   Future<void> _fetchUserDataFromFirebase(String email) async {
     if (_userDataCache.containsKey(email)) {
-      return; // Already fetched
+      return;
     }
 
     try {
@@ -113,16 +105,12 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
       if (querySnapshot.docs.isNotEmpty) {
         final doc = querySnapshot.docs.first;
         final data = doc.data();
-
-        // Store user data in cache
         _userDataCache[email] = data;
 
         // Process profile image
         if (data.containsKey('profileImage') && data['profileImage'] != null) {
           final profileImage = data['profileImage'];
-
           if (profileImage is String && profileImage.startsWith('data:image/')) {
-            // Handle data URI format: data:image/png;base64,...
             final base64Data = profileImage.split(',').last;
             try {
               final imageBytes = base64.decode(base64Data);
@@ -131,7 +119,6 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
               debugPrint('Error decoding base64 image: $e');
             }
           } else if (profileImage is String && profileImage.length > 100) {
-            // Assume it's a raw base64 string without data URI prefix
             try {
               final imageBytes = base64.decode(profileImage);
               _profileImageCache[email] = imageBytes;
@@ -139,7 +126,6 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
               debugPrint('Error decoding raw base64 image: $e');
             }
           } else if (profileImage is String && profileImage.startsWith('http')) {
-            // It's a URL, not base64 - we'll handle this in the UI
             _userDataCache[email]?['profileImageUrl'] = profileImage;
           }
         }
@@ -153,7 +139,7 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
     final cacheKey = '$providerId-$appointmentId';
 
     if (_problemImageCache.containsKey(cacheKey)) {
-      return; // Already fetched
+      return;
     }
 
     try {
@@ -169,9 +155,7 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
 
         if (data.containsKey('problem_image') && data['problem_image'] != null) {
           final problemImage = data['problem_image'];
-
           if (problemImage is String && problemImage.startsWith('data:image/')) {
-            // Handle data URI format: data:image/png;base64,...
             final base64Data = problemImage.split(',').last;
             try {
               final imageBytes = base64.decode(base64Data);
@@ -180,7 +164,6 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
               debugPrint('Error decoding base64 problem image: $e');
             }
           } else if (problemImage is String && problemImage.length > 100) {
-            // Assume it's a raw base64 string without data URI prefix
             try {
               final imageBytes = base64.decode(problemImage);
               _problemImageCache[cacheKey] = imageBytes;
@@ -204,6 +187,22 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
 
   Future<void> _updateAppointmentStatus(String appointmentId, String status) async {
     try {
+      _isLoading.value = true;
+
+      // Find the appointment details
+      final appointment = _appointments.firstWhere(
+            (appt) => appt['id'].toString() == appointmentId,
+        orElse: () => null,
+      );
+
+      if (appointment == null) {
+        Get.snackbar('Error', 'Appointment not found',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: AppColors.errorColor,
+            colorText: Colors.white);
+        return;
+      }
+
       final response = await _apiService.updateAppointmentStatus(
         'electrician',
         appointmentId,
@@ -211,6 +210,9 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
       );
 
       if (response['success']) {
+        // Send notification to user
+        await _sendStatusNotification(appointment, status);
+
         Get.snackbar('Success', 'Appointment $status successfully',
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: AppColors.successColor,
@@ -227,7 +229,36 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: AppColors.errorColor,
           colorText: Colors.white);
+    } finally {
+      _isLoading.value = false;
     }
+  }
+
+  Future<void> _sendStatusNotification(Map<String, dynamic> appointment, String status) async {
+    try {
+      final user = appointment['user'] ?? {};
+      final userEmail = user['email'];
+      final appointmentDate = DateTime.parse(appointment['appointment_date']);
+
+      if (userEmail != null) {
+        await NotificationHelper.sendAppointmentStatusNotification(
+          userEmail: userEmail,
+          appointmentId: appointment['id'].toString(),
+          status: status,
+          serviceType: 'electrician',
+          providerName: 'Your Electrician',
+          appointmentDate: appointmentDate,
+        );
+      }
+    } catch (e) {
+      print('❌ Error sending status notification: $e');
+    }
+  }
+
+  void _openMessageScreen(Map<String, dynamic> appointment) {
+    // TODO: Implement message screen navigation
+    Get.snackbar('Message', 'Message feature coming soon',
+        snackPosition: SnackPosition.BOTTOM);
   }
 
   List<dynamic> _getFilteredAppointments() {
@@ -319,7 +350,7 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
             child: IconButton(
               icon: Icon(Icons.notifications, color: Colors.white),
               onPressed: () {
-                _selectedTab.value = 0; // Switch to pending tab
+                _selectedTab.value = 0;
               },
             ),
           )
@@ -720,10 +751,7 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () => _updateAppointmentStatus(
-                            appointment['id'].toString(),
-                            'completed',
-                          ),
+                          onPressed: () => _openMessageScreen(appointment),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.infoColor,
                             foregroundColor: Colors.white,
@@ -732,8 +760,8 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          icon: Icon(Icons.done_all, size: 20),
-                          label: Text('Mark Complete', style: TextStyle(fontWeight: FontWeight.w600)),
+                          icon: Icon(Icons.message, size: 20),
+                          label: Text('Message', style: TextStyle(fontWeight: FontWeight.w600)),
                         ),
                       ),
                       SizedBox(width: 12),

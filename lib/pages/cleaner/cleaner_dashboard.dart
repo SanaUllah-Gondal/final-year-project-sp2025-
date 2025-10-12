@@ -40,6 +40,12 @@ class CleanerDashboard extends StatelessWidget {
         actions: [
           Obx(() => _buildStatusIndicator()),
           SizedBox(width: 16),
+          // Refresh button for manual check
+          IconButton(
+            icon: Icon(Icons.refresh, color: Colors.white),
+            onPressed: _cleanerController.manuallyCheckRequests,
+            tooltip: 'Check for new requests',
+          ),
         ],
       ),
       body: Obx(() => _pages[_dashboardController.selectedIndex.value]),
@@ -174,65 +180,114 @@ class CleanerHomeContent extends StatelessWidget {
         children: [
           // Online/Offline Toggle Button
           Obx(() => _buildStatusToggleButton()),
-          SizedBox(height: 24),
+          SizedBox(height: 16),
+
+          // Last checked time
+          Obx(() => _buildLastCheckedTime()),
+          SizedBox(height: 8),
 
           // Dashboard Cards Grid
           Expanded(
-            child: GridView.count(
-              crossAxisCount: 2,
-              crossAxisSpacing: 20,
-              mainAxisSpacing: 20,
-              childAspectRatio: 0.85,
-              padding: EdgeInsets.zero,
-              children: [
-                Obx(() => CleanerDashboardCard(
-                  title: "New Requests",
-                  icon: Icons.cleaning_services,
-                  gradientColors: [Color(0xFF00B4DB), Color(0xFF0083B0)],
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => CleanerAppointmentList()),
-                    );
-                  },
-                  showBadge: _controller.hasPendingRequests.value,
-                  badgeCount: _controller.pendingRequestCount.value,
-                )),
-                CleanerDashboardCard(
-                  title: "Ongoing Jobs",
-                  icon: Icons.work,
-                  gradientColors: [Color(0xFF56CCF2), Color(0xFF2F80ED)],
-                  onTap: () {
-                    _controller.updateWorkingStatus(true);
-                  },
-                ),
-                CleanerDashboardCard(
-                  title: "Completed Jobs",
-                  icon: Icons.check_circle,
-                  gradientColors: [Color(0xFF76B852), Color(0xFF8DC26F)],
-                  onTap: () {
-                    _controller.updateWorkingStatus(false);
-                  },
-                ),
-                CleanerDashboardCard(
-                  title: "Earnings",
-                  icon: Icons.attach_money,
-                  gradientColors: [Color(0xFFDA22FF), Color(0xFF9733EE)],
-                  onTap: () {
-                    // Handle earnings tap
-                    Get.snackbar(
-                      'Coming Soon',
-                      'Earnings feature will be available soon!',
-                      snackPosition: SnackPosition.BOTTOM,
-                    );
-                  },
-                ),
-              ],
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await _controller.refreshData();
+              },
+              child: GridView.count(
+                crossAxisCount: 2,
+                crossAxisSpacing: 20,
+                mainAxisSpacing: 20,
+                childAspectRatio: 0.85,
+                padding: EdgeInsets.zero,
+                children: [
+                  Obx(() => CleanerDashboardCard(
+                    title: "New Requests",
+                    icon: Icons.cleaning_services,
+                    gradientColors: [Color(0xFF00B4DB), Color(0xFF0083B0)],
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => CleanerAppointmentList()),
+                      );
+                    },
+                    showBadge: _controller.hasPendingRequests.value,
+                    badgeCount: _controller.pendingRequestCount.value,
+                  )),
+                  CleanerDashboardCard(
+                    title: "Ongoing Jobs",
+                    icon: Icons.work,
+                    gradientColors: [Color(0xFF56CCF2), Color(0xFF2F80ED)],
+                    onTap: () {
+                      _controller.updateWorkingStatus(true);
+                    },
+                  ),
+                  CleanerDashboardCard(
+                    title: "Completed Jobs",
+                    icon: Icons.check_circle,
+                    gradientColors: [Color(0xFF76B852), Color(0xFF8DC26F)],
+                    onTap: () {
+                      _controller.updateWorkingStatus(false);
+                    },
+                  ),
+                  CleanerDashboardCard(
+                    title: "Earnings",
+                    icon: Icons.attach_money,
+                    gradientColors: [Color(0xFFDA22FF), Color(0xFF9733EE)],
+                    onTap: () {
+                      Get.snackbar(
+                        'Coming Soon',
+                        'Earnings feature will be available soon!',
+                        snackPosition: SnackPosition.BOTTOM,
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildLastCheckedTime() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.access_time,
+            color: Colors.white70,
+            size: 14,
+          ),
+          SizedBox(width: 8),
+          Text(
+            'Last checked: ${_formatTime(_controller.lastCheckedTime.value)}',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(DateTime time) {
+    final now = DateTime.now();
+    final difference = now.difference(time);
+
+    if (difference.inSeconds < 60) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return '${time.hour}:${time.minute.toString().padLeft(2, '0')}';
+    }
   }
 
   Widget _buildStatusToggleButton() {

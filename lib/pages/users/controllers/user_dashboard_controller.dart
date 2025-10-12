@@ -102,7 +102,7 @@ class HomeController extends GetxController {
 
   void _startAppointmentTimer() {
     // Check appointments every 5 seconds
-    _appointmentTimer = Timer.periodic(Duration(seconds: 5), (timer) {
+    _appointmentTimer = Timer.periodic(Duration(seconds: 30), (timer) {
       if (!isLoadingAppointments.value) {
         checkForPendingAppointments();
       }

@@ -100,6 +100,7 @@ class _MapScreenState extends State<MapScreen> {
       }
       // Query the users collection by email
       print('=====================================================$collectionName');
+      print('=====================================================$email');
       final querySnapshot = await FirebaseFirestore.instance
           .collection(collectionName)
           .where('email', isEqualTo: email)
@@ -113,6 +114,8 @@ class _MapScreenState extends State<MapScreen> {
         // Get hourly rate from user document
         if (data.containsKey('hourlyRate')) {
           final hourlyRate = data['hourlyRate'];
+          print('=====================================================$hourlyRate');
+
           if (hourlyRate is double) {
             return hourlyRate;
           } else if (hourlyRate is int) {

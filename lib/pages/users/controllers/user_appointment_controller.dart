@@ -321,11 +321,10 @@ class UserAppointmentsController extends GetxController {
       }
 
       // Update appointment status to completed with payment method
-      final response = await _apiService.completeAppointmentWithPayment(
+      final response = await _apiService.updateAppointmentStatus(
         serviceType.toLowerCase(),
         appointmentId,
-        paymentMethod,
-        amount,
+        'completed',
       );
 
       if (response['success']) {

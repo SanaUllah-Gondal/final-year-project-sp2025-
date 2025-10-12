@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:plumber_project/widgets/custom_badge.dart';
+import 'package:get/get.dart';
 
 class ElectricianDashboardCard extends StatelessWidget {
   final String title;
@@ -7,7 +7,7 @@ class ElectricianDashboardCard extends StatelessWidget {
   final List<Color> gradientColors;
   final VoidCallback onTap;
   final bool showBadge;
-  final int? badgeCount;
+  final int badgeCount;
 
   const ElectricianDashboardCard({
     Key? key,
@@ -16,109 +16,157 @@ class ElectricianDashboardCard extends StatelessWidget {
     required this.gradientColors,
     required this.onTap,
     this.showBadge = false,
-    this.badgeCount,
+    this.badgeCount = 0,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: BoxConstraints(
-        minHeight: 140,
-        maxHeight: 140,
-      ),
-      child: Stack(
-        children: [
-          // Main Card
-          GestureDetector(
-            onTap: onTap,
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: gradientColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: gradientColors.last.withOpacity(0.3),
-                    blurRadius: 15,
-                    offset: Offset(0, 6),
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Icon with white circle background
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        icon,
-                        size: 28,
-                        color: Colors.white,
-                      ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: gradientColors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: gradientColors.last.withOpacity(0.4),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // Main content
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Icon with white background
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
                     ),
-                    SizedBox(height: 12),
-
-                    // Title
+                    child: Icon(
+                      icon,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (showBadge && badgeCount > 0) ...[
+                    SizedBox(height: 8),
                     Text(
-                      title,
+                      '$badgeCount New',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
+                        color: Colors.yellowAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
+                ],
+              ),
+            ),
+
+            // Red dot badge for new requests
+            if (showBadge && badgeCount > 0)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  padding: EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: Text(
+                    badgeCount > 9 ? '9+' : '$badgeCount',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
 
-          // Badge for pending requests
-          if (showBadge && badgeCount != null && badgeCount! > 0)
-            Positioned(
-              top: 12,
-              right: 12,
-              child: CustomBadge(
-                count: badgeCount!,
-                backgroundColor: Colors.red,
-                textColor: Colors.white,
-                size: 24,
-                fontSize: 10,
-                child: SizedBox.shrink(),
+            // Pulsing animation for attention
+            if (showBadge && badgeCount > 0)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  child: PulseAnimation(),
+                ),
               ),
-            ),
-
-          // Ripple effect
-          Positioned.fill(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: onTap,
-                splashColor: Colors.white.withOpacity(0.2),
-                highlightColor: Colors.white.withOpacity(0.1),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class PulseAnimation extends StatefulWidget {
+  @override
+  _PulseAnimationState createState() => _PulseAnimationState();
+}
+
+class _PulseAnimationState extends State<PulseAnimation> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _animation = Tween<double>(begin: 1.0, end: 1.5).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _animation.value,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.red.withOpacity(0.6),
+            ),
+          ),
+        );
+      },
     );
   }
 }
