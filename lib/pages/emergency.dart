@@ -307,14 +307,8 @@ class EmergencyScreen extends StatelessWidget {
 
 // ------------------ PLUMBER SECTION ------------------
 
-class PlumberServicesPage extends StatelessWidget {
-  final List<String> plumberServices = const [
-    "Washbasin Repair",
-    "Tap Leakage Fix",
-    "Toilet Installation",
-    "Drain Cleaning",
-    "Pipe Blockage",
-  ];
+
+
 
   @override
   Widget build(BuildContext context) {
