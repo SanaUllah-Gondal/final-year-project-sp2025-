@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:plumber_project/pages/chat_list.dart';
 import 'package:plumber_project/pages/users/user_map.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
@@ -740,7 +741,7 @@ class HomeController extends GetxController {
 
   void onTabSelected(int index, BuildContext context) {
     if (index == 1) {
-      Get.to(() => EmergencyScreen());
+      Get.to(() => ChatListScreen());
     } else if (index == 2) {
       Get.to(() => ProfileScreen());
     } else {

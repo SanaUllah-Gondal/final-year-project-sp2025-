@@ -1,9 +1,7 @@
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:plumber_project/controllers/auth_controller.dart';
 import 'package:plumber_project/services/storage_service.dart';
-
 import '../routes/app_pages.dart';
 
 class LoginController extends GetxController {
@@ -26,6 +24,8 @@ class LoginController extends GetxController {
 
   @override
   void onClose() {
+    emailController.dispose();
+    passwordController.dispose();
     super.onClose();
   }
 
@@ -38,6 +38,31 @@ class LoginController extends GetxController {
     } catch (e) {
       debugPrint('[LoginController] Error loading saved credentials: $e');
     }
+  }
+
+  /// ✅ Email Validation Helper
+  String? validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please enter your email';
+    }
+
+    // Basic email regex pattern
+    const emailPattern = r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$';
+    final regex = RegExp(emailPattern);
+
+    if (!regex.hasMatch(value.trim())) {
+      return 'Invalid email format';
+    }
+
+    return null;
+  }
+
+  /// ✅ Password Validation Helper (optional)
+  String? validatePassword(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please enter your password';
+    }
+    return null;
   }
 
   Future<void> login() async {
@@ -82,7 +107,6 @@ class LoginController extends GetxController {
   }
 
   void navigateToSignup() {
-
-     Get.toNamed(AppRoutes.SIGNUP);
+    Get.toNamed(AppRoutes.SIGNUP);
   }
 }

@@ -1,4 +1,3 @@
-// lib/pages/authentication/login.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:plumber_project/controllers/login_controller.dart';
@@ -30,6 +29,7 @@ class LoginScreen extends StatelessWidget {
       ),
       body: Stack(
         children: [
+          // Background gradient
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -43,15 +43,18 @@ class LoginScreen extends StatelessWidget {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Form(
-                key: controller.formKey, // Using the key from controller
+                key: controller.formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 60),
                     const Icon(Icons.lock, size: 80, color: Colors.black),
                     const SizedBox(height: 20),
+
+                    // ✅ Email Field
                     TextFormField(
                       controller: controller.emailController,
+                      validator: controller.validateEmail,
                       decoration: const InputDecoration(
                         labelText: "Email",
                         filled: true,
@@ -60,19 +63,13 @@ class LoginScreen extends StatelessWidget {
                         prefixIcon: Icon(Icons.email),
                       ),
                       keyboardType: TextInputType.emailAddress,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your email';
-                        }
-                        if (!GetUtils.isEmail(value)) {
-                          return 'Please enter a valid email';
-                        }
-                        return null;
-                      },
                     ),
                     const SizedBox(height: 20),
+
+                    // ✅ Password Field
                     TextFormField(
                       controller: controller.passwordController,
+                      validator: controller.validatePassword,
                       decoration: const InputDecoration(
                         labelText: "Password",
                         filled: true,
@@ -81,21 +78,14 @@ class LoginScreen extends StatelessWidget {
                         prefixIcon: Icon(Icons.lock),
                       ),
                       obscureText: true,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your password';
-                        }
-                        if (value.length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
-                        return null;
-                      },
                     ),
                     const SizedBox(height: 10),
+
+                    // ✅ Remember Me
                     Obx(() => CheckboxListTile(
                       value: controller.rememberMe.value,
                       onChanged: (bool? value) {
-                        controller.rememberMe.value = value ?? false;
+                        controller.toggleRememberMe(value ?? false);
                       },
                       title: const Text(
                         "Remember Me",
@@ -105,8 +95,11 @@ class LoginScreen extends StatelessWidget {
                       contentPadding: EdgeInsets.zero,
                     )),
                     const SizedBox(height: 20),
+
+                    // ✅ Login Button
                     Obx(() => ElevatedButton(
-                      onPressed: controller.isLoading.value ? null : controller.login,
+                      onPressed:
+                      controller.isLoading.value ? null : controller.login,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFFCD00),
                         padding: const EdgeInsets.symmetric(vertical: 15),
@@ -123,6 +116,8 @@ class LoginScreen extends StatelessWidget {
                       ),
                     )),
                     const SizedBox(height: 20),
+
+                    // ✅ Signup Redirect
                     TextButton(
                       onPressed: controller.navigateToSignup,
                       child: const Text(

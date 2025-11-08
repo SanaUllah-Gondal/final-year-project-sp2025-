@@ -179,9 +179,9 @@ class HomeScreen extends StatelessWidget {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.emergency_outlined),
+            icon: Icon(Icons.chat),
             activeIcon: Icon(Icons.emergency_rounded),
-            label: 'Emergency',
+            label: 'Chat',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),

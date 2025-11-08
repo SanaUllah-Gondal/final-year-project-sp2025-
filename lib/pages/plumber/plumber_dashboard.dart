@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:plumber_project/controllers/dashboard_controller.dart';
+import 'package:plumber_project/pages/chat_list.dart';
 import 'package:plumber_project/pages/users/profile.dart';
 import 'package:plumber_project/pages/notification.dart';
 import 'package:plumber_project/pages/plumber/plumber_appointment_list.dart';
@@ -131,9 +132,9 @@ class PlumberDashboard extends StatelessWidget {
               label: 'Home',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.notifications_outlined),
+              icon: Icon(Icons.chat),
               activeIcon: Icon(Icons.notifications),
-              label: 'Notifications',
+              label: 'Chat',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outlined),
@@ -156,7 +157,7 @@ class PlumberDashboard extends StatelessWidget {
     if (index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => NotificationsScreen()),
+        MaterialPageRoute(builder: (context) => ChatListScreen()),
       );
     } else if (index == 2) {
       Navigator.push(

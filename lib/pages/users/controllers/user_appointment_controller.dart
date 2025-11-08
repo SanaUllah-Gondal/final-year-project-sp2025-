@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:get/get.dart';
@@ -8,11 +9,14 @@ import 'package:plumber_project/widgets/app_color.dart';
 import 'package:plumber_project/notification/send_notification.dart';
 
 import '../../../services/stripe.dart';
+import '../../chat_screen.dart';
 
 
 class UserAppointmentsController extends GetxController {
   final ApiService _apiService = Get.find();
   final StripePaymentService _stripeService = StripePaymentService.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   final List<String> tabs = ['All', 'Pending', 'Confirmed', 'Completed', 'Cancelled'];
   final selectedTab = 0.obs;
@@ -77,7 +81,70 @@ class UserAppointmentsController extends GetxController {
       isLoading.value = false;
     }
   }
+  Future<void> openOrCreateChat({
+    required String providerEmail,
+    required String providerName,
+    String? providerImage,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        Get.snackbar('Error', 'Please sign in to start chat');
+        return;
+      }
 
+      final userEmail = user.email!;
+      final userName = user.displayName ?? 'User';
+
+      // Just create the chat documents and navigate
+      await _firestore
+          .collection('messages')
+          .doc(userEmail)
+          .collection('chats')
+          .doc(providerEmail)
+          .set({
+        'otherUserName': providerName,
+        'otherUserImage': providerImage,
+        'lastMessage': '',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount': 0,
+        'isOnline': false,
+      }, SetOptions(merge: true));
+
+      await _firestore
+          .collection('messages')
+          .doc(providerEmail)
+          .collection('chats')
+          .doc(userEmail)
+          .set({
+        'otherUserName': userName,
+        'otherUserImage': user.photoURL,
+        'lastMessage': '',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount': 0,
+        'isOnline': false,
+      }, SetOptions(merge: true));
+
+      // Navigate to chat screen
+      Get.to(
+            () => ChatScreen(
+          otherUserEmail: providerEmail,
+          otherUserName: providerName,
+          otherUserImage: providerImage,
+        ),
+      );
+
+    } catch (e) {
+      print('Error creating chat: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to start chat',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        colorText: Colors.white,
+      );
+    }
+  }
   Future<List<dynamic>> _enhanceAppointmentsWithFirebaseData(
       List<dynamic> appointments,
       String serviceType

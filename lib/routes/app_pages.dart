@@ -116,8 +116,12 @@ class AppPages {
       name: AppRoutes.ElectricianAppointments,
       page: () => ElectricianAppointmentList(),
     ),
+
   ];
 }
+
+
+
 
 class AuthBinding implements Bindings {
   @override

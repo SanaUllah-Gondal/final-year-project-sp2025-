@@ -270,7 +270,28 @@ class AppointmentCard extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: () => controller.navigateToChat(appointment),
+            onPressed: () {
+              final providerData = appointment['provider'] ?? {};
+              final providerEmail = providerData['email'] ?? '';
+              final providerName = providerData['name'] ?? 'Unknown';
+              final providerImage = providerData['profile_image'];
+
+              if (providerEmail.isNotEmpty) {
+                controller.openOrCreateChat(
+                  providerEmail: providerEmail,
+                  providerName: providerName,
+                  providerImage: providerImage,
+                );
+              } else {
+                Get.snackbar(
+                  'Error',
+                  'Provider email not found',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: Colors.redAccent,
+                  colorText: Colors.white,
+                );
+              }
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryColor.withOpacity(0.1),
               foregroundColor: AppColors.primaryColor,
@@ -703,3 +724,4 @@ class AppointmentCard extends StatelessWidget {
     );
   }
 }
+// In UserAppointmentsController
