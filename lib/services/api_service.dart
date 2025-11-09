@@ -16,6 +16,52 @@ class ApiService extends GetxService {
       debugPrint('[ApiService] $message');
     }
   }
+  Future<Map<String, dynamic>> placeBid(
+      String serviceType,
+      String appointmentId,
+      double bidAmount,
+      ) async {
+    final StorageService storageService = Get.find();
+    final token = await storageService.getToken();
+
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/api/appointments/$serviceType/$appointmentId/price'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+        body: json.encode({'price': bidAmount}),
+      );
+
+      if (_isHtml(response.body)) {
+        return {
+          'success': false,
+          'message': 'Server error: Invalid HTML response',
+        };
+      }
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Status updated successfully',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': responseData['message'] ?? 'Failed to update status',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+      };
+    }
+  }
 
   static Future<Map<String, dynamic>> getAppointments(String serviceType) async {
     final prefs = await SharedPreferences.getInstance();

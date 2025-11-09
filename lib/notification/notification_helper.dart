@@ -19,6 +19,41 @@ class NotificationHelper {
       return null;
     }
   }
+  static Future<void> sendBidNotification({
+    required String userEmail,
+    required String appointmentId,
+    required double bidAmount,
+    required String serviceType,
+    required String providerName,
+  }) async {
+    try {
+      final userFcmToken = await getUserFcmToken(userEmail);
+
+      if (userFcmToken != null && userFcmToken.isNotEmpty) {
+        final title = '💰 New Bid Received';
+        final body = '$providerName placed a bid of Rs. ${bidAmount.toStringAsFixed(0)} for your $serviceType appointment';
+
+        final notificationResult = await SendNotificationService.sendBidNotification(
+          token: userFcmToken,
+          appointmentId: appointmentId,
+          bidAmount: bidAmount,
+          serviceType: serviceType,
+          providerName: providerName,
+          priority: 'HIGH',
+        );
+
+        if (notificationResult['success'] == true) {
+          print('✅ Bid notification sent successfully to $userEmail');
+        } else {
+          print('❌ Failed to send bid notification: ${notificationResult['error']}');
+        }
+      } else {
+        print('⚠️ No FCM token found for user: $userEmail');
+      }
+    } catch (e) {
+      print('❌ Error sending bid notification: $e');
+    }
+  }
 
   static Future<void> sendAppointmentStatusNotification({
     required String userEmail,

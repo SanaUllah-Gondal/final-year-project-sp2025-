@@ -360,6 +360,59 @@ class UserAppointmentsController extends GetxController {
       isLoading.value = false;
     }
   }
+  Future<void> confirmModifiedAppointment(String appointmentId, String serviceType) async {
+    try {
+      isLoading.value = true;
+      print('Cancelling appointment: $appointmentId, service: $serviceType');
+
+      // Use the updateAppointmentStatus API with 'cancelled' status
+      final response = await _apiService.updateAppointmentStatus(
+        serviceType.toLowerCase(),
+        appointmentId,
+        'confirmed',
+      );
+
+      if (response['success']) {
+        // Get appointment details for notification
+        final appointment = _findAppointmentById(appointmentId);
+        if (appointment != null) {
+          // Send notification to provider (non-blocking)
+          _sendStatusUpdateNotification(
+            appointment: appointment,
+            newStatus: 'confirmed',
+            serviceType: serviceType,
+          );
+        }
+
+        Get.snackbar(
+          'Success',
+          'Appointment confirmed successfully',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.successColor,
+          colorText: Colors.white,
+        );
+        await loadUserAppointments(); // Refresh the list
+      } else {
+        Get.snackbar(
+          'Error',
+          response['message'] ?? 'Failed to confirmed appointment',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.errorColor,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to confirmed appointment: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
 
   Future<void> completeBooking(
       String appointmentId,

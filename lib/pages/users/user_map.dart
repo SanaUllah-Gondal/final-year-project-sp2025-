@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
@@ -29,7 +29,8 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final Completer<GoogleMapController> _controller = Completer();
   final Set<Marker> _markers = {};
-  final Map<String, double> _providerPrices = {}; // Store provider prices by ID
+  final Map<String, double> _providerDistances = {}; // Store provider distances by ID
+  final Map<String, double> _providerBookingRates = {}; // Store calculated booking rates by ID
   String? _selectedProviderId;
   double? _basePrice;
   bool _showProvidersList = false;
@@ -41,96 +42,103 @@ class _MapScreenState extends State<MapScreen> {
   BitmapDescriptor? _electricianIcon;
   BitmapDescriptor? _userIcon;
   BitmapDescriptor? _selectedIcon;
-  bool _isLoadingPrices = false;
+  bool _isLoadingRates = false;
+
+  // Service rates per kilometer in Pakistani Rupees
+  static const Map<String, double> serviceRatesPerKm = {
+    'plumber': 50.0,    // 50 Rs per km
+    'cleaner': 30.0,    // 30 Rs per km
+    'electrician': 60.0, // 60 Rs per km
+  };
+
+  // Minimum booking rate in Pakistani Rupees
+  static const Map<String, double> minimumRates = {
+    'plumber': 500.0,    // Minimum 500 Rs
+    'cleaner': 300.0,    // Minimum 300 Rs
+    'electrician': 600.0, // Minimum 600 Rs
+  };
 
   @override
   void initState() {
     super.initState();
-    _initMarkers();
     _loadCustomIcons();
-    _loadProviderPrices();
+    _calculateDistancesAndRates();
   }
 
-  Future<void> _loadProviderPrices() async {
+  Future<void> _calculateDistancesAndRates() async {
     setState(() {
-      _isLoadingPrices = true;
+      _isLoadingRates = true;
     });
 
-
-
     try {
+      final userLatLng = LatLng(
+        widget.userLocation.latitude,
+        widget.userLocation.longitude,
+      );
+
       for (var provider in widget.providers) {
         final providerId = provider['provider_id']?.toString() ?? provider['id']?.toString();
-        final email = provider['email']?.toString();
-        final providerType = provider['provider_type']?.toString().toLowerCase();
 
-        if (providerId != null && email != null && email.isNotEmpty) {
-          final price = await _getHourlyRateFromCloud(email,providerType!);
-          print('price==========================================================$price');
-          if (price != null) {
-            _providerPrices[providerId] = price;
+        if (providerId != null) {
+          final double? lat = parseDouble(provider['latitude']);
+          final double? lng = parseDouble(provider['longitude']);
+
+          if (lat != null && lng != null) {
+            final providerLatLng = LatLng(lat, lng);
+
+            // Calculate distance
+            double distance = _calculateDistance(userLatLng, providerLatLng);
+            _providerDistances[providerId] = distance;
+
+            // Calculate booking rate based on distance
+            double bookingRate = _calculateBookingRate(distance, widget.serviceType);
+            _providerBookingRates[providerId] = bookingRate;
           }
         }
       }
     } catch (e) {
-      debugPrint("Error loading provider prices: $e");
+      debugPrint("Error calculating distances and rates: $e");
     } finally {
       setState(() {
-        _isLoadingPrices = false;
+        _isLoadingRates = false;
       });
+      _initMarkers();
     }
   }
 
-  Future<double?> _getHourlyRateFromCloud(String email, String providerType) async {
-    try {
+  double _calculateDistance(LatLng start, LatLng end) {
+    const double earthRadius = 6371.0; // Earth's radius in kilometers
 
-      String collectionName;
-      switch (providerType.toLowerCase()) {
-        case 'plumber':
-          collectionName = 'plumber';
-          break;
-        case 'electrician':
-          collectionName = 'electrician';
-          break;
-        case 'cleaner':
-          collectionName = 'cleaner';
-          break;
-        default:
-          collectionName = 'provider'; // fallback collection
-      }
-      // Query the users collection by email
-      print('=====================================================$collectionName');
-      print('=====================================================$email');
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection(collectionName)
-          .where('email', isEqualTo: email)
-          .limit(1)
-          .get();
+    double dLat = _toRadians(end.latitude - start.latitude);
+    double dLon = _toRadians(end.longitude - start.longitude);
 
-      if (querySnapshot.docs.isNotEmpty) {
-        final doc = querySnapshot.docs.first;
-        final data = doc.data();
+    double a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRadians(start.latitude)) *
+            cos(_toRadians(end.latitude)) *
+            sin(dLon / 2) * sin(dLon / 2);
 
-        // Get hourly rate from user document
-        if (data.containsKey('hourlyRate')) {
-          final hourlyRate = data['hourlyRate'];
-          print('=====================================================$hourlyRate');
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    double distance = earthRadius * c;
 
-          if (hourlyRate is double) {
-            return hourlyRate;
-          } else if (hourlyRate is int) {
-            return hourlyRate.toDouble();
-          } else if (hourlyRate is String) {
-            return double.tryParse(hourlyRate);
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching hourly rate: $e');
-    }
+    return distance;
+  }
 
-    // Return null if not found or error
-    return null;
+  double _toRadians(double degree) {
+    return degree * pi / 180;
+  }
+
+  double _calculateBookingRate(double distance, String serviceType) {
+    double ratePerKm = serviceRatesPerKm[serviceType.toLowerCase()] ?? 50.0;
+    double minimumRate = minimumRates[serviceType.toLowerCase()] ?? 500.0;
+     print("distance=distance $distance *ratePerKm $ratePerKm");
+    double calculatedRate = distance * ratePerKm;
+   print("------------------------------------------$distance * $ratePerKm");
+    // Ensure rate is not less than minimum
+
+      calculatedRate = minimumRate+calculatedRate;
+
+
+    return calculatedRate;
   }
 
   Future<void> _loadCustomIcons() async {
@@ -201,6 +209,10 @@ class _MapScreenState extends State<MapScreen> {
       allPoints.add(pos);
       final bool isSelected = _selectedProviderId == id;
 
+      // Get distance and rate for this provider
+      final double? distance = _providerDistances[id];
+      final double? bookingRate = _providerBookingRates[id];
+
       markers.add(
         Marker(
           markerId: MarkerId(id),
@@ -210,7 +222,9 @@ class _MapScreenState extends State<MapScreen> {
               : _getMarkerIconForProviderType(providerType),
           infoWindow: InfoWindow(
             title: provider['name'] ?? 'Provider',
-            snippet: '${providerType} • Exp: ${provider['experience']} yrs',
+            snippet: distance != null
+                ? '${distance.toStringAsFixed(1)} km • Rs. ${bookingRate?.toStringAsFixed(0)}'
+                : '${providerType} • Exp: ${provider['experience']} yrs',
           ),
           onTap: () => _showProviderDetails(provider),
           zIndex: isSelected ? 3 : 1,
@@ -244,12 +258,13 @@ class _MapScreenState extends State<MapScreen> {
 
   void _showProviderDetails(Map<String, dynamic> provider) {
     final providerId = provider['provider_id']?.toString() ?? provider['id']?.toString();
-    final hourlyRate = providerId != null ? _providerPrices[providerId] : null;
+    final double? distance = providerId != null ? _providerDistances[providerId] : null;
+    final double? bookingRate = providerId != null ? _providerBookingRates[providerId] : null;
 
     setState(() {
       _selectedProviderId = providerId;
       _selectedProvider = provider;
-      _basePrice = hourlyRate;
+      _basePrice = bookingRate;
     });
 
     showModalBottomSheet(
@@ -259,7 +274,8 @@ class _MapScreenState extends State<MapScreen> {
         provider: provider,
         serviceType: widget.serviceType,
         onBookAppointment: _navigateToAppointmentScreen,
-        hourlyRate: hourlyRate,
+        bookingRate: bookingRate,
+        distance: distance,
       ),
     );
   }
@@ -268,7 +284,8 @@ class _MapScreenState extends State<MapScreen> {
     if (_selectedProvider == null) return;
 
     final providerId = _selectedProvider!['provider_id']?.toString() ?? _selectedProvider!['id']?.toString();
-    final hourlyRate = providerId != null ? _providerPrices[providerId] : _getDefaultHourlyRate(widget.serviceType);
+    final double? bookingRate = providerId != null ? _providerBookingRates[providerId] : null;
+    final double? distance = providerId != null ? _providerDistances[providerId] : null;
 
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -276,23 +293,11 @@ class _MapScreenState extends State<MapScreen> {
           provider: _selectedProvider!,
           serviceType: widget.serviceType,
           userLocation: widget.userLocation,
-          basePrice: hourlyRate ?? _getDefaultHourlyRate(widget.serviceType),
+          basePrice: bookingRate ?? _calculateBookingRate(0, widget.serviceType),
+          distance: distance,
         ),
       ),
     );
-  }
-
-  double _getDefaultHourlyRate(String providerType) {
-    switch (providerType.toLowerCase()) {
-      case 'plumber':
-        return 50.0;
-      case 'electrician':
-        return 60.0;
-      case 'cleaner':
-        return 35.0;
-      default:
-        return 45.0;
-    }
   }
 
   Future<void> _changeMapMode(MapMode mode) async {
@@ -367,7 +372,7 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ),
               ),
-              if (_isLoadingPrices)
+              if (_isLoadingRates)
                 const Padding(
                   padding: EdgeInsets.all(16),
                   child: CircularProgressIndicator(),
@@ -379,12 +384,14 @@ class _MapScreenState extends State<MapScreen> {
                   itemBuilder: (context, index) {
                     final provider = widget.providers[index];
                     final providerId = provider['provider_id']?.toString() ?? provider['id']?.toString();
-                    final hourlyRate = providerId != null ? _providerPrices[providerId] : null;
+                    final double? distance = providerId != null ? _providerDistances[providerId] : null;
+                    final double? bookingRate = providerId != null ? _providerBookingRates[providerId] : null;
                     final isSelected = _selectedProviderId == providerId;
 
                     return ProviderCard(
                       provider: provider,
-                      hourlyRate: hourlyRate,
+                      bookingRate: bookingRate, // Now using booking rate instead of hourly rate
+                      distance: distance,
                       isSelected: isSelected,
                       onNavigate: (LatLng position) async {
                         final controller = await _controller.future;
@@ -421,6 +428,7 @@ class _MapScreenState extends State<MapScreen> {
     final theme = Theme.of(context);
     final Color darkBlue = Color(0xFF003E6B);
     final Color tealBlue = Color(0xFF00A8A8);
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Nearby ${widget.serviceType} Providers'),

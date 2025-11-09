@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
@@ -9,11 +10,15 @@ import 'package:plumber_project/services/storage_service.dart';
 import 'package:plumber_project/models/user_location.dart';
 import '../../../notification/fcm_service.dart';
 import '../../../notification/notification_service.dart';
+import '../../../widgets/app_color.dart';
+import '../../chat_screen.dart';
 
 class ElectricianDashboardController extends GetxController {
   final ApiService _apiService = Get.find<ApiService>();
   final StorageService _storageService = Get.find<StorageService>();
   final NotificationService notificationService = Get.find<NotificationService>();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Observable variables
   var isOnline = false.obs;
@@ -84,6 +89,67 @@ class ElectricianDashboardController extends GetxController {
       debugPrint('[ElectricianDashboardController] Initialization complete');
     } catch (e) {
       debugPrint('[ElectricianDashboardController] Error initializing: $e');
+    }
+  }
+  Future<void> openOrCreateChat({
+    required String userEmail,
+    required String userName,
+    String? userImage,
+  }) async {
+    try {
+      final currentUser =  _auth.currentUser!;
+
+
+      final currentUserEmail = currentUser.email!;
+      final currentUserName = currentUser.displayName ?? 'Electrician';
+
+      // Create chat documents
+      await _firestore
+          .collection('messages')
+          .doc(currentUserEmail)
+          .collection('chats')
+          .doc(userEmail)
+          .set({
+        'otherUserName': userName,
+        'otherUserImage': userImage,
+        'lastMessage': '',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount': 0,
+        'isOnline': false,
+      }, SetOptions(merge: true));
+
+      await _firestore
+          .collection('messages')
+          .doc(userEmail)
+          .collection('chats')
+          .doc(currentUserEmail)
+          .set({
+        'otherUserName': currentUserName,
+        'otherUserImage': currentUser.photoURL,
+        'lastMessage': '',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount': 0,
+        'isOnline': false,
+      }, SetOptions(merge: true));
+
+      // Navigate to chat screen
+      Get.to(
+            () => ChatScreen(
+          otherUserEmail: userEmail,
+          otherUserName: userName,
+          otherUserImage: userImage,
+        ),
+      );
+
+    } catch (e) {
+      print('Error creating chat: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to start chat',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        colorText: Colors.white,
+      );
     }
   }
 

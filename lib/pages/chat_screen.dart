@@ -378,7 +378,6 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
-
   AppBar _buildAppBar() {
     return AppBar(
       backgroundColor: Colors.white,

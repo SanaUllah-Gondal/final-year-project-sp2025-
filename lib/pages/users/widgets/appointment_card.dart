@@ -29,7 +29,6 @@ class AppointmentCard extends StatelessWidget {
     final providerPhone = providerData['phone_number'] ?? 'Not available';
     final providerImage = providerData['profile_image'];
 
-    // Use controller's safe price formatting
     final price = controller.formatPrice(appointment['price']);
 
     return Container(
@@ -57,11 +56,9 @@ class AppointmentCard extends StatelessWidget {
                 // Header Row
                 Row(
                   children: [
-                    // Provider Profile with Fallback
                     _buildProviderAvatar(providerImage, providerName, serviceType),
                     const SizedBox(width: 16),
 
-                    // Service Info
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,7 +88,6 @@ class AppointmentCard extends StatelessWidget {
                       ),
                     ),
 
-                    // Status Badge
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -126,30 +122,18 @@ class AppointmentCard extends StatelessWidget {
                 const SizedBox(height: 20),
                 const Divider(color: AppColors.lightGrey),
 
-                // Appointment Details
-                _buildDetailRow(
-                  icon: Icons.calendar_today,
-                  text: formattedDate,
-                ),
+                _buildDetailRow(icon: Icons.calendar_today, text: formattedDate),
+                const SizedBox(height: 8),
+                _buildDetailRow(icon: Icons.access_time, text: formattedTime),
                 const SizedBox(height: 8),
                 _buildDetailRow(
-                  icon: Icons.access_time,
-                  text: formattedTime,
-                ),
+                    icon: Icons.location_on,
+                    text: appointment['address'] ?? 'No address provided',
+                    maxLines: 2),
                 const SizedBox(height: 8),
                 _buildDetailRow(
-                  icon: Icons.location_on,
-                  text: appointment['address'] ?? 'No address provided',
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 8),
-                _buildDetailRow(
-                  icon: Icons.attach_money,
-                  text: price,
-                  isBold: true,
-                ),
+                    icon: Icons.attach_money, text: price, isBold: true),
 
-                // Service Type Badge
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -160,11 +144,9 @@ class AppointmentCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        AppointmentUtils.getServiceIcon(serviceType),
-                        size: 14,
-                        color: AppointmentUtils.getServiceColor(serviceType),
-                      ),
+                      Icon(AppointmentUtils.getServiceIcon(serviceType),
+                          size: 14,
+                          color: AppointmentUtils.getServiceColor(serviceType)),
                       const SizedBox(width: 6),
                       Text(
                         serviceType.toUpperCase(),
@@ -177,50 +159,25 @@ class AppointmentCard extends StatelessWidget {
                   ),
                 ),
 
-                // Action Buttons
+                // Status-specific Actions
                 if (status == 'pending') ...[
                   const SizedBox(height: 16),
                   _buildPendingActionButtons(providerType),
                 ],
 
-                // Confirmed Status Action Buttons
                 if (status == 'confirmed') ...[
                   const SizedBox(height: 16),
                   _buildConfirmedActionButtons(providerType),
                 ],
 
-                // Completed/Cancelled Status Message
+                if (status == 'modified') ...[
+                  const SizedBox(height: 16),
+                  _buildModifiedActionButtons(providerType),
+                ],
+
                 if (status == 'completed' || status == 'cancelled') ...[
                   const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: status == 'completed'
-                          ? AppColors.successColor.withOpacity(0.1)
-                          : AppColors.errorColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          status == 'completed' ? Icons.verified : Icons.cancel,
-                          color: status == 'completed' ? AppColors.successColor : AppColors.errorColor,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          status == 'completed'
-                              ? 'This appointment has been completed'
-                              : 'This appointment was cancelled',
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: status == 'completed' ? AppColors.successColor : AppColors.errorColor,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildFinalStatusMessage(status),
                 ],
               ],
             ),
@@ -230,10 +187,11 @@ class AppointmentCard extends StatelessWidget {
     );
   }
 
+  /// ---------- BUTTON SECTIONS ----------
+
   Widget _buildPendingActionButtons(String providerType) {
     return Row(
       children: [
-        // Cancel Button
         Expanded(
           child: ElevatedButton(
             onPressed: () => _showCancelConfirmation(providerType),
@@ -251,10 +209,7 @@ class AppointmentCard extends StatelessWidget {
               children: [
                 Icon(Icons.cancel, size: 16),
                 SizedBox(width: 6),
-                Text(
-                  'Cancel',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
+                Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -266,60 +221,10 @@ class AppointmentCard extends StatelessWidget {
   Widget _buildConfirmedActionButtons(String providerType) {
     return Column(
       children: [
-        // Chat Button
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () {
-              final providerData = appointment['provider'] ?? {};
-              final providerEmail = providerData['email'] ?? '';
-              final providerName = providerData['name'] ?? 'Unknown';
-              final providerImage = providerData['profile_image'];
-
-              if (providerEmail.isNotEmpty) {
-                controller.openOrCreateChat(
-                  providerEmail: providerEmail,
-                  providerName: providerName,
-                  providerImage: providerImage,
-                );
-              } else {
-                Get.snackbar(
-                  'Error',
-                  'Provider email not found',
-                  snackPosition: SnackPosition.BOTTOM,
-                  backgroundColor: Colors.redAccent,
-                  colorText: Colors.white,
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor.withOpacity(0.1),
-              foregroundColor: AppColors.primaryColor,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.chat, size: 16),
-                SizedBox(width: 6),
-                Text(
-                  'Chat with Provider',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-        ),
+        _buildChatButton(),
         const SizedBox(height: 12),
-
-        // Complete and Cancel Buttons
         Row(
           children: [
-            // Cancel Button
             Expanded(
               child: ElevatedButton(
                 onPressed: () => _showCancelConfirmation(providerType),
@@ -327,9 +232,7 @@ class AppointmentCard extends StatelessWidget {
                   backgroundColor: AppColors.errorColor.withOpacity(0.1),
                   foregroundColor: AppColors.errorColor,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 child: const Row(
@@ -337,18 +240,12 @@ class AppointmentCard extends StatelessWidget {
                   children: [
                     Icon(Icons.cancel, size: 16),
                     SizedBox(width: 6),
-                    Text(
-                      'Cancel',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
+                    Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
             ),
-
             const SizedBox(width: 12),
-
-            // Complete Button
             Expanded(
               child: Obx(() => ElevatedButton(
                 onPressed: controller.isProcessingPayment.value
@@ -360,9 +257,7 @@ class AppointmentCard extends StatelessWidget {
                       : AppColors.successColor,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 child: controller.isProcessingPayment.value
@@ -379,10 +274,8 @@ class AppointmentCard extends StatelessWidget {
                   children: [
                     Icon(Icons.check_circle, size: 16),
                     SizedBox(width: 6),
-                    Text(
-                      'Complete',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
+                    Text('Complete',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
                   ],
                 ),
               )),
@@ -393,17 +286,155 @@ class AppointmentCard extends StatelessWidget {
     );
   }
 
+  Widget _buildModifiedActionButtons(String providerType) {
+    return Column(
+      children: [
+        _buildChatButton(),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () {
+                  controller.confirmModifiedAppointment(
+                      appointment['id'].toString(), providerType);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle, size: 16),
+                    SizedBox(width: 6),
+                    Text('Confirm',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _showCancelConfirmation(providerType),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.errorColor.withOpacity(0.1),
+                  foregroundColor: AppColors.errorColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.cancel, size: 16),
+                    SizedBox(width: 6),
+                    Text('Cancel',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFinalStatusMessage(String status) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: status == 'completed'
+            ? AppColors.successColor.withOpacity(0.1)
+            : AppColors.errorColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            status == 'completed' ? Icons.verified : Icons.cancel,
+            color:
+            status == 'completed' ? AppColors.successColor : AppColors.errorColor,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            status == 'completed'
+                ? 'This appointment has been completed'
+                : 'This appointment was cancelled',
+            style: AppTextStyles.bodyMedium.copyWith(
+              color:
+              status == 'completed' ? AppColors.successColor : AppColors.errorColor,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ---------- REUSABLE WIDGETS ----------
+  Widget _buildChatButton() {
+    final providerData = appointment['provider'] ?? {};
+    final providerEmail = providerData['email'] ?? '';
+    final providerName = providerData['name'] ?? 'Unknown';
+    final providerImage = providerData['profile_image'];
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: () {
+          if (providerEmail.isNotEmpty) {
+            controller.openOrCreateChat(
+              providerEmail: providerEmail,
+              providerName: providerName,
+              providerImage: providerImage,
+            );
+          } else {
+            Get.snackbar('Error', 'Provider email not found',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.redAccent,
+                colorText: Colors.white);
+          }
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryColor.withOpacity(0.1),
+          foregroundColor: AppColors.primaryColor,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.chat, size: 16),
+            SizedBox(width: 6),
+            Text('Chat with Provider',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// ---------- HELPERS ----------
   String _getServiceType(String? providerRole, String? apiServiceType) {
-    // Use provider role first, then fallback to API service type
     if (providerRole != null && providerRole != 'unknown') {
-      // Capitalize first letter
       return providerRole[0].toUpperCase() + providerRole.substring(1);
     }
-
     if (apiServiceType != null && apiServiceType != 'Unknown') {
       return apiServiceType;
     }
-
     return 'Unknown Service';
   }
 
@@ -411,7 +442,6 @@ class AppointmentCard extends StatelessWidget {
     final serviceColor = AppointmentUtils.getServiceColor(serviceType);
 
     if (profileImage != null && profileImage.isNotEmpty) {
-      // Handle base64 images
       if (profileImage.startsWith('data:image/') || profileImage.length > 100) {
         try {
           return Container(
@@ -430,12 +460,10 @@ class AppointmentCard extends StatelessWidget {
               ),
             ),
           );
-        } catch (e) {
+        } catch (_) {
           return _buildFallbackAvatar(providerName, serviceColor);
         }
-      }
-      // Handle URL images
-      else if (profileImage.startsWith('http')) {
+      } else if (profileImage.startsWith('http')) {
         return Container(
           width: 50,
           height: 50,
@@ -449,10 +477,7 @@ class AppointmentCard extends StatelessWidget {
               fit: BoxFit.cover,
               placeholder: (context, url) => Container(
                 color: serviceColor.withOpacity(0.1),
-                child: Icon(
-                  Icons.person,
-                  color: serviceColor,
-                ),
+                child: Icon(Icons.person, color: serviceColor),
               ),
               errorWidget: (context, url, error) =>
                   _buildFallbackAvatar(providerName, serviceColor),
@@ -474,25 +499,14 @@ class AppointmentCard extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: serviceColor.withOpacity(0.3), width: 2),
       ),
-      child: Icon(
-        Icons.person,
-        color: serviceColor,
-        size: 24,
-      ),
+      child: Icon(Icons.person, color: serviceColor, size: 24),
     );
   }
 
   Uint8List _decodeBase64Image(String base64String) {
-    try {
-      if (base64String.startsWith('data:image/')) {
-        final base64Data = base64String.split(',').last;
-        return base64.decode(base64Data);
-      } else {
-        return base64.decode(base64String);
-      }
-    } catch (e) {
-      throw Exception('Invalid base64 image');
-    }
+    final base64Data =
+    base64String.startsWith('data:image/') ? base64String.split(',').last : base64String;
+    return base64.decode(base64Data);
   }
 
   Widget _buildDetailRow({
@@ -525,7 +539,8 @@ class AppointmentCard extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => AppointmentDetailsBottomSheet(appointment: appointment),
+      builder: (context) =>
+          AppointmentDetailsBottomSheet(appointment: appointment),
     );
   }
 
@@ -533,12 +548,10 @@ class AppointmentCard extends StatelessWidget {
     Get.dialog(
       AlertDialog(
         title: const Text('Cancel Appointment'),
-        content: const Text('Are you sure you want to cancel this appointment? This action cannot be undone.'),
+        content: const Text(
+            'Are you sure you want to cancel this appointment? This action cannot be undone.'),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('No, Keep It'),
-          ),
+          TextButton(onPressed: () => Get.back(), child: const Text('No, Keep It')),
           TextButton(
             onPressed: () {
               Get.back();
@@ -547,10 +560,7 @@ class AppointmentCard extends StatelessWidget {
                 providerType,
               );
             },
-            child: Text(
-              'Yes, Cancel',
-              style: TextStyle(color: AppColors.errorColor),
-            ),
+            child: Text('Yes, Cancel', style: TextStyle(color: AppColors.errorColor)),
           ),
         ],
       ),
@@ -612,116 +622,38 @@ class AppointmentCard extends StatelessWidget {
       );
     }
   }
-
   Future<String?> _showPaymentMethodDialog(double amount) async {
-    return await Get.dialog<String>(
-      Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Select Payment Method',
-                style: AppTextStyles.subtitle1.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Total Amount: ${controller.formatPrice(amount)}',
-                style: AppTextStyles.bodyLarge.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryColor,
-                ),
-              ),
-              const SizedBox(height: 20),
+    String? selectedMethod;
 
-              // Online Payment Option
-              _buildPaymentOption(
-                icon: Icons.credit_card,
-                title: 'Pay Online',
-                subtitle: 'Secure payment with Stripe',
-                value: 'online',
-              ),
-
-              const SizedBox(height: 12),
-
-              // Cash Payment Option
-              _buildPaymentOption(
-                icon: Icons.money,
-                title: 'Pay with Cash',
-                subtitle: 'Pay directly to the provider',
-                value: 'cash',
-              ),
-
-              const SizedBox(height: 20),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Get.back(),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+    await Get.dialog(
+      AlertDialog(
+        title: const Text('Select Payment Method'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<String>(
+              title: const Text('Cash'),
+              value: 'cash',
+              groupValue: selectedMethod,
+              onChanged: (value) {
+                selectedMethod = value;
+                Get.back();
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('Online Payment'),
+              value: 'online',
+              groupValue: selectedMethod,
+              onChanged: (value) {
+                selectedMethod = value;
+                Get.back();
+              },
+            ),
+          ],
         ),
       ),
     );
-  }
 
-  Widget _buildPaymentOption({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String value,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => Get.back(result:value),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.lightGrey),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: AppColors.primaryColor, size: 24),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.greyColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: AppColors.greyColor),
-            ],
-          ),
-        ),
-      ),
-    );
+    return selectedMethod;
   }
 }
-// In UserAppointmentsController

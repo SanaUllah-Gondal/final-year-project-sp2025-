@@ -13,7 +13,7 @@ import '../../widgets/app_color.dart';
 import '../../widgets/app_text_style.dart';
 import '../../widgets/custom_badge.dart';
 import '../../widgets/loading_shimmer.dart';
-
+import '../chat_screen.dart';
 
 class CleanerAppointmentList extends StatefulWidget {
   @override
@@ -23,6 +23,7 @@ class CleanerAppointmentList extends StatefulWidget {
 class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
   final CleanerDashboardController _controller = Get.find();
   final ApiService _apiService = Get.find();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final List<String> _tabs = ['Pending', 'Confirmed', 'Completed', 'Cancelled'];
   var _selectedTab = 0.obs;
@@ -35,6 +36,10 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
   final Map<String, Uint8List?> _profileImageCache = {};
   final Map<String, Uint8List?> _problemImageCache = {};
 
+  // Bidding state
+  final Map<String, double> _bidPrices = {};
+  final Map<String, bool> _isPlacingBid = {};
+
   @override
   void initState() {
     super.initState();
@@ -44,7 +49,7 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
   Future<void> _loadAppointments() async {
     try {
       _isLoading.value = true;
-      print('Loading cleaner appointments...');
+      print('Loading Cleaner appointments...');
 
       final response = await _apiService.getCleanerAppointments();
       print('Raw API response: $response');
@@ -56,6 +61,20 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
         if (appointmentsData is List) {
           _appointments.value = appointmentsData;
           _checkPendingRequests();
+
+          // Initialize bid prices - handle both String and numeric values
+          for (var appointment in appointmentsData) {
+            final appointmentId = appointment['id'].toString();
+            final price = appointment['price'];
+            if (price is String) {
+              _bidPrices[appointmentId] = double.tryParse(price) ?? 0.0;
+            } else if (price is num) {
+              _bidPrices[appointmentId] = price.toDouble();
+            } else {
+              _bidPrices[appointmentId] = 0.0;
+            }
+            _isPlacingBid[appointmentId] = false;
+          }
 
           // Pre-fetch user data from Firebase for all appointments
           for (var appointment in appointmentsData) {
@@ -235,6 +254,47 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
     }
   }
 
+  Future<void> _placeBid(String appointmentId, double bidPrice) async {
+    try {
+      _isPlacingBid[appointmentId] = true;
+      update();
+
+      final response = await _apiService.placeBid(
+        'cleaner',
+        appointmentId,
+        bidPrice,
+      );
+
+      if (response['success']) {
+        Get.snackbar('Success', 'Bid placed successfully!',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: AppColors.successColor,
+            colorText: Colors.white);
+
+        // Send bid notification to user
+        final appointment = _appointments.firstWhere(
+              (appt) => appt['id'].toString() == appointmentId,
+        );
+        await _sendBidNotification(appointment, bidPrice);
+
+        await _loadAppointments(); // Refresh the list
+      } else {
+        Get.snackbar('Error', response['message'] ?? 'Failed to place bid',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: AppColors.errorColor,
+            colorText: Colors.white);
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to place bid: $e',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.errorColor,
+          colorText: Colors.white);
+    } finally {
+      _isPlacingBid[appointmentId] = false;
+      update();
+    }
+  }
+
   Future<void> _sendStatusNotification(Map<String, dynamic> appointment, String status) async {
     try {
       final user = appointment['user'] ?? {};
@@ -256,10 +316,23 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
     }
   }
 
-  void _openMessageScreen(Map<String, dynamic> appointment) {
-    // TODO: Implement message screen navigation
-    Get.snackbar('Message', 'Message feature coming soon',
-        snackPosition: SnackPosition.BOTTOM);
+  Future<void> _sendBidNotification(Map<String, dynamic> appointment, double bidPrice) async {
+    try {
+      final user = appointment['user'] ?? {};
+      final userEmail = user['email'];
+
+      if (userEmail != null) {
+        await NotificationHelper.sendBidNotification(
+          userEmail: userEmail,
+          appointmentId: appointment['id'].toString(),
+          bidAmount: bidPrice,
+          serviceType: 'cleaner',
+          providerName: 'Your Cleaner',
+        );
+      }
+    } catch (e) {
+      print('❌ Error sending bid notification: $e');
+    }
   }
 
   List<dynamic> _getFilteredAppointments() {
@@ -328,6 +401,82 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showBidDialog(String appointmentId, double currentPrice) {
+    double bidPrice = currentPrice;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.gavel, color: AppColors.primaryColor),
+                SizedBox(width: 8),
+                Text('Place Your Bid'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Set your bid price for this appointment',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                SizedBox(height: 20),
+                Text(
+                  'Rs. ${bidPrice.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryColor,
+                  ),
+                ),
+                SizedBox(height: 20),
+                Slider(
+                  value: bidPrice,
+                  min: currentPrice - 100,
+                  max: currentPrice + 500,
+                  divisions: 60,
+                  onChanged: (value) {
+                    setState(() {
+                      bidPrice = value;
+                    });
+                  },
+                  activeColor: AppColors.primaryColor,
+                ),
+                SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Rs. ${(currentPrice - 100).toStringAsFixed(0)}'),
+                    Text('Rs. ${(currentPrice + 500).toStringAsFixed(0)}'),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _placeBid(appointmentId, bidPrice);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                ),
+                child: Text('Place Bid'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -507,6 +656,17 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
     final providerId = appointment['provider_id']?.toString();
     final appointmentId = appointment['id']?.toString();
 
+    // Handle price conversion safely
+    final price = appointment['price'];
+    double currentPrice;
+    if (price is String) {
+      currentPrice = double.tryParse(price) ?? 0.0;
+    } else if (price is num) {
+      currentPrice = price.toDouble();
+    } else {
+      currentPrice = 0.0;
+    }
+
     // Get Firebase user data if available
     final firebaseUserData = userEmail != null ? _userDataCache[userEmail] : null;
     final phoneNumber = firebaseUserData?['contactNumber'] ?? 'No phone number';
@@ -626,7 +786,11 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
                 SizedBox(height: 8),
                 _buildDetailRow(Icons.location_on, appointment['address'] ?? 'No address provided'),
                 SizedBox(height: 8),
-                _buildDetailRow(Icons.attach_money, '\$${appointment['price'] ?? '0.00'}'),
+                _buildDetailRow(Icons.attach_money, 'Rs. ${currentPrice.toStringAsFixed(0)}'),
+
+                // Bid Information
+                if (appointment['bid_amount'] != null && appointment['bid_amount'] > 0)
+                  _buildDetailRow(Icons.gavel, 'Your Bid: Rs. ${appointment['bid_amount'].toStringAsFixed(0)}'),
 
                 // Problem Description
                 if (appointment['description'] != null) ...[
@@ -703,46 +867,102 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
 
                 // Action Buttons
                 if (status == 'pending')
-                  Row(
+                  Column(
                     children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _updateAppointmentStatus(
-                            appointment['id'].toString(),
-                            'confirmed',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.successColor,
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _updateAppointmentStatus(
+                                appointment['id'].toString(),
+                                'confirmed',
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.successColor,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              icon: Icon(Icons.check_circle, size: 20),
+                              label: Text('Accept', style: TextStyle(fontWeight: FontWeight.w600)),
                             ),
                           ),
-                          icon: Icon(Icons.check_circle, size: 20),
-                          label: Text('Accept', style: TextStyle(fontWeight: FontWeight.w600)),
-                        ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _updateAppointmentStatus(
+                                appointment['id'].toString(),
+                                'cancelled',
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: AppColors.errorColor),
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              icon: Icon(Icons.cancel, size: 20, color: AppColors.errorColor),
+                              label: Text(
+                                'Reject',
+                                style: TextStyle(color: AppColors.errorColor, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _updateAppointmentStatus(
-                            appointment['id'].toString(),
-                            'cancelled',
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: AppColors.errorColor),
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                      SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _showBidDialog(appointmentId!, currentPrice),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.warningColor,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              icon: Icon(Icons.gavel, size: 20),
+                              label: _isPlacingBid[appointmentId] == true
+                                  ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                                  : Text('Place Bid', style: TextStyle(fontWeight: FontWeight.w600)),
                             ),
                           ),
-                          icon: Icon(Icons.cancel, size: 20, color: AppColors.errorColor),
-                          label: Text(
-                            'Reject',
-                            style: TextStyle(color: AppColors.errorColor, fontWeight: FontWeight.w600),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                final userName = user['name'] ?? 'Customer';
+                                final userImage = profileImageUrl ?? profileImageBytes;
+                                _controller.openOrCreateChat(
+                                  userEmail: userEmail!,
+                                  userName: userName,
+                                  userImage: userImage,
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: AppColors.infoColor),
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              icon: Icon(Icons.message, size: 20, color: AppColors.infoColor),
+                              label: Text(
+                                'Chat',
+                                style: TextStyle(color: AppColors.infoColor, fontWeight: FontWeight.w600),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
@@ -752,7 +972,15 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () => _openMessageScreen(appointment),
+                          onPressed: () {
+                            final userName = user['name'] ?? 'Customer';
+                            final userImage = profileImageUrl ?? profileImageBytes;
+                            _controller.openOrCreateChat(
+                              userEmail: userEmail!,
+                              userName: userName,
+                              userImage: userImage,
+                            );
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.infoColor,
                             foregroundColor: Colors.white,
@@ -842,5 +1070,11 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
         ),
       ],
     );
+  }
+
+  void update() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 }

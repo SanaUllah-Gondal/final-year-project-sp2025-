@@ -11,7 +11,8 @@ class ProviderDetailsSheet extends StatefulWidget {
   final VoidCallback onBookAppointment;
   final Color primaryColor;
   final Color secondaryColor;
-  final double? hourlyRate;
+  final double? bookingRate;
+  final double? distance;
 
   const ProviderDetailsSheet({
     Key? key,
@@ -20,7 +21,8 @@ class ProviderDetailsSheet extends StatefulWidget {
     required this.onBookAppointment,
     this.primaryColor = Colors.blue,
     this.secondaryColor = Colors.teal,
-    this.hourlyRate
+    this.bookingRate,
+    this.distance,
   }) : super(key: key);
 
   @override
@@ -31,7 +33,6 @@ class _ProviderDetailsSheetState extends State<ProviderDetailsSheet> {
   String? _firebaseProfileImageUrl;
   bool _isLoadingFirebaseImage = false;
   Uint8List? _firebaseProfileImageBytes;
-  double? _firebaseHourlyRate;
 
   @override
   void initState() {
@@ -107,27 +108,6 @@ class _ProviderDetailsSheetState extends State<ProviderDetailsSheet> {
             setState(() {
               _firebaseProfileImageUrl = profileImage;
             });
-          }
-        }
-
-        // Get hourlyRate from Firebase
-        if (data.containsKey('hourlyRate') && data['hourlyRate'] != null) {
-          final hourlyRate = data['hourlyRate'];
-          if (hourlyRate is double) {
-            setState(() {
-              _firebaseHourlyRate = hourlyRate;
-            });
-          } else if (hourlyRate is int) {
-            setState(() {
-              _firebaseHourlyRate = hourlyRate.toDouble();
-            });
-          } else if (hourlyRate is String) {
-            final parsedRate = double.tryParse(hourlyRate);
-            if (parsedRate != null) {
-              setState(() {
-                _firebaseHourlyRate = parsedRate;
-              });
-            }
           }
         }
       }
@@ -269,16 +249,18 @@ class _ProviderDetailsSheetState extends State<ProviderDetailsSheet> {
     );
   }
 
-  // Get the hourly rate with priority: Firebase > API
-  double getHourlyRate() {
-    // Priority 1: Use Firebase hourly rate if available
-    if (_firebaseHourlyRate != null) {
-      return _firebaseHourlyRate!;
+  // Get service rate information
+  String getServiceRateInfo() {
+    switch (widget.serviceType.toLowerCase()) {
+      case 'plumber':
+        return 'Rs. 50/km (Min: Rs. 500)';
+      case 'cleaner':
+        return 'Rs. 30/km (Min: Rs. 300)';
+      case 'electrician':
+        return 'Rs. 60/km (Min: Rs. 600)';
+      default:
+        return 'Rs. 50/km (Min: Rs. 500)';
     }
-
-    // Priority 2: Use API hourly rate
-    final apiHourlyRate = parseDouble(widget.provider['hourly_rate']) ?? 0;
-    return apiHourlyRate;
   }
 
   // -------------------------------------------
@@ -299,7 +281,6 @@ class _ProviderDetailsSheetState extends State<ProviderDetailsSheet> {
 
     final double rating = parseDouble(widget.provider['rating']) ?? 0;
     final int reviews = int.tryParse(widget.provider['reviews']?.toString() ?? '0') ?? 0;
-    final double hourlyRate = getHourlyRate(); // Use the prioritized hourly rate
     final String serviceArea = widget.provider['service_area']?.toString() ?? 'Not specified';
     final String skills = widget.provider['skills']?.toString() ?? 'Not specified';
 
@@ -308,7 +289,7 @@ class _ProviderDetailsSheetState extends State<ProviderDetailsSheet> {
     debugPrint('Provider data: ${widget.provider}');
     debugPrint('Raw profile image: $rawProfileImage');
     debugPrint('Firebase profile image available: ${_firebaseProfileImageBytes != null || _firebaseProfileImageUrl != null}');
-    debugPrint('Hourly rate - Firebase: $_firebaseHourlyRate, API: ${widget.provider['hourly_rate']}, Final: $hourlyRate');
+    debugPrint('Booking rate: ${widget.bookingRate}, Distance: ${widget.distance}');
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -393,7 +374,7 @@ class _ProviderDetailsSheetState extends State<ProviderDetailsSheet> {
 
             const SizedBox(height: 20),
 
-            // Experience & Rate
+            // Experience & Rate & Distance
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -405,11 +386,60 @@ class _ProviderDetailsSheetState extends State<ProviderDetailsSheet> {
                 ),
                 _buildInfoCard(
                     icon: Icons.attach_money,
-                    title: 'Hourly Rate',
-                    value: hourlyRate > 0 ? '\$${hourlyRate.toStringAsFixed(2)}' : 'Not set',
+                    title: 'Booking Rate',
+                    value: widget.bookingRate != null ? 'Rs. ${widget.bookingRate!.toStringAsFixed(0)}' : 'Calculating...',
                     color: providerColor
                 ),
+                if (widget.distance != null)
+                  _buildInfoCard(
+                      icon: Icons.directions,
+                      title: 'Distance',
+                      value: '${widget.distance!.toStringAsFixed(1)} km',
+                      color: providerColor
+                  ),
               ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Rate Information
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue[100]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Rate Information',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue[800],
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Service Rate: ${getServiceRateInfo()}',
+                    style: TextStyle(
+                      color: Colors.blue[700],
+                      fontSize: 12,
+                    ),
+                  ),
+                  if (widget.distance != null && widget.bookingRate != null)
+                    Text(
+                      'Calculated based on ${widget.distance!.toStringAsFixed(1)} km distance',
+                      style: TextStyle(
+                        color: Colors.blue[600],
+                        fontSize: 11,
+                      ),
+                    ),
+                ],
+              ),
             ),
 
             const SizedBox(height: 20),

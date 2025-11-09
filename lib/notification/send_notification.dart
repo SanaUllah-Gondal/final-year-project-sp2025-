@@ -162,7 +162,35 @@ class SendNotificationService {
 
     return stringifiedData;
   }
+// Send bid notification with high priority
+  static Future<Map<String, dynamic>> sendBidNotification({
+    required String token,
+    required String appointmentId,
+    required double bidAmount,
+    required String serviceType,
+    required String providerName,
+    String? providerImage,
+    String priority = 'HIGH',
+  }) async {
+    final data = {
+      'screen': 'appointments',
+      'appointment_id': appointmentId,
+      'service_type': serviceType,
+      'bid_amount': bidAmount.toString(),
+      'provider_name': providerName,
+      'type': 'new_bid',
+      'timestamp': DateTime.now().toIso8601String(),
+    };
 
+    return await sendNotification(
+      token: token,
+      title: '💰 New Bid Received',
+      body: '$providerName placed a bid of Rs. ${bidAmount.toStringAsFixed(0)} for your $serviceType appointment',
+      data: data,
+      imageUrl: providerImage,
+      priority: priority,
+    );
+  }
   // Send notification to multiple tokens
   static Future<Map<String, dynamic>> sendMulticastNotification({
     required List<String> tokens,

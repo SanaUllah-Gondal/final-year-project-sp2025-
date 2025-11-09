@@ -15,13 +15,13 @@ import '../../Apis.dart';
 import '../services/appointment_service.dart';
 import '../widgets/map_utils.dart';
 
-
 class AppointmentBookingController extends GetxController {
   // Input parameters
   final Map<String, dynamic> provider;
   final String serviceType;
   final Position userLocation;
   final double basePrice;
+  final double? distance;
 
   // Form controllers
   final TextEditingController descriptionController = TextEditingController();
@@ -39,6 +39,10 @@ class AppointmentBookingController extends GetxController {
   bool isLoading = false;
   String? errorMessage;
 
+  // New bid-related variables
+  bool isFormValid = false;
+  double userBidPrice = 0.0;
+
   // Services
   final ImagePicker _picker = ImagePicker();
   final StorageService _storageService = Get.find<StorageService>();
@@ -48,6 +52,7 @@ class AppointmentBookingController extends GetxController {
     required this.serviceType,
     required this.userLocation,
     required this.basePrice,
+    this.distance,
   });
 
   @override
@@ -55,12 +60,18 @@ class AppointmentBookingController extends GetxController {
     super.onInit();
     _initializeData();
     print('🎯 AppointmentBookingController initialized');
+    print('💰 Base Price: Rs. $basePrice');
+    print('📍 Distance: ${distance?.toStringAsFixed(1)} km');
+
+    // Initialize user bid price with base price
+    userBidPrice = basePrice;
+    finalPrice = basePrice;
   }
 
   void _initializeData() {
     addressController.text = provider['address_name'] ?? '';
     selectedServiceType = _getDefaultServiceType();
-    _calculatePrice();
+    _checkFormValidity();
   }
 
   String _getDefaultServiceType() {
@@ -81,20 +92,95 @@ class AppointmentBookingController extends GetxController {
     provider['provider_type']?.toString().toLowerCase() ?? serviceType.toLowerCase(),
   );
 
-  // Price calculation
-  void _calculatePrice() {
-    finalPrice = appointmentType == 'emergency' ? basePrice * 1.2 : basePrice;
-    update();
+  // Form validation check
+  void _checkFormValidity() {
+    final isValid = selectedDate != null &&
+        selectedTime != null &&
+        selectedServiceType != null &&
+        selectedServiceType!.isNotEmpty &&
+        descriptionController.text.isNotEmpty &&
+        addressController.text.isNotEmpty;
+
+    if (isValid != isFormValid) {
+      isFormValid = isValid;
+      update();
+    }
   }
 
+  // Update methods that trigger form validation
   void updateAppointmentType(String type) {
     appointmentType = type;
     _calculatePrice();
+    _checkFormValidity();
+    update();
   }
 
   void updateServiceType(String? type) {
     selectedServiceType = type;
+    _checkFormValidity();
     update();
+  }
+
+  void updateSelectedDateTime(DateTime dateTime) {
+    selectedDate = dateTime;
+    selectedTime = TimeOfDay.fromDateTime(dateTime);
+
+    dateController.text = _formatDate(dateTime);
+    timeController.text = _formatTime(dateTime);
+
+    _checkFormValidity();
+    update();
+    print('📅 DateTime selected: $dateTime');
+  }
+
+  void updateDescription(String text) {
+    descriptionController.text = text;
+    _checkFormValidity();
+    update();
+  }
+
+  void updateAddress(String text) {
+    addressController.text = text;
+    _checkFormValidity();
+    update();
+  }
+
+  // Bid price methods
+  void updateBidPrice(double newPrice) {
+    userBidPrice = newPrice;
+    update();
+    print('💰 Bid updated: Rs. $newPrice');
+  }
+
+  void confirmBidAndBook() {
+    finalPrice = userBidPrice;
+    _calculatePrice();
+    submitAppointment();
+  }
+
+  void _calculatePrice() {
+    double calculatedPrice = userBidPrice;
+
+    if (appointmentType == 'emergency') {
+      calculatedPrice = userBidPrice * 1.2;
+    }
+
+    finalPrice = calculatedPrice;
+    update();
+  }
+
+  // Get rate calculation information
+  String get rateCalculationInfo {
+    switch (serviceType.toLowerCase()) {
+      case 'plumber':
+        return 'Rs. 50 per km (Minimum: Rs. 500)';
+      case 'cleaner':
+        return 'Rs. 30 per km (Minimum: Rs. 300)';
+      case 'electrician':
+        return 'Rs. 60 per km (Minimum: Rs. 600)';
+      default:
+        return 'Rs. 50 per km (Minimum: Rs. 500)';
+    }
   }
 
   // Image handling
@@ -120,48 +206,7 @@ class AppointmentBookingController extends GetxController {
     update();
   }
 
-  // Date/Time handling
-  Future<void> selectDate(BuildContext context) async {
-    try {
-      final DateTime? picked = await showDatePicker(
-        context: context,
-        initialDate: DateTime.now(),
-        firstDate: DateTime.now(),
-        lastDate: DateTime.now().add(const Duration(days: 365)),
-      );
-
-      if (picked != null && picked != selectedDate) {
-        selectedDate = picked;
-        dateController.text = "${picked.day}/${picked.month}/${picked.year}";
-        update();
-        print('📅 Date selected: $picked');
-      }
-    } catch (e) {
-      print('❌ Error selecting date: $e');
-      setError('Error selecting date: $e');
-    }
-  }
-
-  Future<void> selectTime(BuildContext context) async {
-    try {
-      final TimeOfDay? picked = await showTimePicker(
-        context: context,
-        initialTime: TimeOfDay.now(),
-      );
-
-      if (picked != null) {
-        selectedTime = picked;
-        timeController.text = picked.format(context);
-        update();
-        print('⏰ Time selected: $picked');
-      }
-    } catch (e) {
-      print('❌ Error selecting time: $e');
-      setError('Error selecting time: $e');
-    }
-  }
-
-  // Validation
+  // Form validation
   bool validateForm() {
     if (selectedDate == null || selectedTime == null) {
       setError('Please select both date and time');
@@ -272,7 +317,7 @@ class AppointmentBookingController extends GetxController {
         'Accept': 'application/json',
       });
 
-      // Fields
+      // Fields - Updated for distance-based pricing
       request.fields.addAll({
         'provider_id': providerId,
         'appointment_type': appointmentType,
@@ -281,11 +326,15 @@ class AppointmentBookingController extends GetxController {
         'appointment_date': appointmentDateTime.toIso8601String(),
         'address': addressController.text,
         'base_price': basePrice.toString(),
+        'final_price': finalPrice.toString(),
+        'distance_km': distance?.toString() ?? '0',
         'latitude': userLocation.latitude.toString(),
         'longitude': userLocation.longitude.toString(),
+        'rate_calculation_info': rateCalculationInfo,
       });
 
       print('📦 Request fields: ${request.fields}');
+      print('💰 Price Details - Base: Rs. $basePrice, Final: Rs. $finalPrice, Distance: ${distance?.toStringAsFixed(1)} km');
 
       // Image file
       if (problemImage != null) {
@@ -327,6 +376,7 @@ class AppointmentBookingController extends GetxController {
     }
   }
 
+
   // Firebase saving
   Future<void> _saveToFirebase(String providerId, DateTime appointmentDateTime) async {
     try {
@@ -352,7 +402,7 @@ class AppointmentBookingController extends GetxController {
       final userName = _storageService.getName() ?? 'Customer';
       print('👤 User: $userName ($userEmail)');
 
-      // Build data
+      // Build data - Updated for bid pricing
       final appointmentData = {
         'provider_id': providerId,
         'provider_name': provider['name'] ?? 'Unknown Provider',
@@ -365,13 +415,18 @@ class AppointmentBookingController extends GetxController {
         'appointment_date': appointmentDateTime.toIso8601String(),
         'address': addressController.text,
         'base_price': basePrice,
+        'user_bid_price': userBidPrice,
         'final_price': finalPrice,
+        'distance_km': distance,
+        'rate_calculation_info': rateCalculationInfo,
         'latitude': userLocation.latitude,
         'longitude': userLocation.longitude,
         'problem_image': base64Image,
         'status': 'pending',
         'created_at': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
+        'currency': 'PKR',
+        'service_type': serviceType,
       };
 
       print('📊 Firebase data prepared, saving...');
@@ -379,7 +434,6 @@ class AppointmentBookingController extends GetxController {
       print('✅ Firebase save completed successfully in $collectionName');
     } catch (e) {
       print('❌ Firebase save error: $e');
-      // Don't rethrow - Firebase failure shouldn't block the main flow
     }
   }
 
@@ -406,20 +460,22 @@ class AppointmentBookingController extends GetxController {
         'service_type': serviceType.toLowerCase(),
         'appointment_date': appointmentDateTime.toIso8601String(),
         'type': 'new_appointment',
+        'booking_rate': finalPrice.toString(),
+        'user_bid_price': userBidPrice.toString(),
+        'distance': distance?.toStringAsFixed(1) ?? '0',
       };
 
       print('📨 Sending notification via API...');
       await SendNotificationService.sendNotification(
         token: providerToken,
         title: '📅 New Appointment Request',
-        body: '$userName booked a $appointmentType $serviceType appointment on $formattedDate',
+        body: '$userName booked a $appointmentType $serviceType appointment on $formattedDate - Bid: Rs. $userBidPrice',
         data: notificationData,
       );
 
       print('✅ Notification sent successfully');
     } catch (e) {
       print('❌ Notification error: $e');
-      // Don't rethrow - notification failure shouldn't block the main flow
     }
   }
 
@@ -485,6 +541,18 @@ class AppointmentBookingController extends GetxController {
     return '${dateTime.day}/${dateTime.month}/${dateTime.year} at ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  String _formatTime(DateTime date) {
+    final hour = date.hour;
+    final minute = date.minute;
+    final period = hour < 12 ? 'AM' : 'PM';
+    final displayHour = hour % 12 == 0 ? 12 : hour % 12;
+    return '$displayHour:${minute.toString().padLeft(2, '0')} $period';
+  }
+
   List<String> getServiceTypeOptions() {
     switch (serviceType.toLowerCase()) {
       case 'cleaner':
@@ -533,12 +601,36 @@ class AppointmentBookingController extends GetxController {
               style: const TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 10),
+            if (distance != null)
+              Text(
+                'Distance: ${distance!.toStringAsFixed(1)} km',
+                style: const TextStyle(fontSize: 14),
+              ),
+            const SizedBox(height: 5),
             Text(
-              'Total amount: \$${finalPrice.toStringAsFixed(2)}',
+              'Your Bid: Rs. ${userBidPrice.toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              'Total amount: Rs. ${finalPrice.toStringAsFixed(0)}',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.green,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              rateCalculationInfo,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
               ),
             ),
           ],
