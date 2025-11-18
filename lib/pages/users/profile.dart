@@ -778,7 +778,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: Container(
+      bottomNavigationBar: Container( 
         decoration: BoxDecoration(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           boxShadow: [
