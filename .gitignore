@@ -11,13 +11,11 @@
 .svn/
 .env
 lib/services/stripe.dart
+lib/notification/get_server_key.dart
 
 .swiftpm/
 migrate_working_dir/
 
-# Firebase/Notification sensitive files
-lib/notification/get_server_key.dart
-**/get_server_key.dart
 
 # IntelliJ related
 *.iml
