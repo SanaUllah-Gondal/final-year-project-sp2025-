@@ -15,6 +15,8 @@ final Color onlineColor = Color(0xFF4CAF50);
 final Color offlineColor = Color(0xFFF44336);
 final Color workingColor = Color(0xFFFF9800);
 final Color accentYellow = Color(0xFFFFD700);
+final Color verifiedColor = Color(0xFF4CAF50); // Green for verified status
+final Color unverifiedColor = Color(0xFFFF9800); // Orange for unverified
 
 class PlumberDashboard extends StatelessWidget {
   final DashboardController _dashboardController = Get.find();
@@ -40,7 +42,9 @@ class PlumberDashboard extends StatelessWidget {
         centerTitle: true,
         actions: [
           Obx(() => _buildStatusIndicator()),
-          SizedBox(width: 16),
+          SizedBox(width: 8),
+          Obx(() => _buildFaceVerificationIndicator()),
+          SizedBox(width: 8),
           // Refresh button for manual check
           IconButton(
             icon: Icon(Icons.refresh, color: Colors.white),
@@ -56,15 +60,15 @@ class PlumberDashboard extends StatelessWidget {
 
   Widget _buildStatusIndicator() {
     return Container(
-      margin: EdgeInsets.only(right: 16),
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: EdgeInsets.only(right: 0),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: _plumberController.isWorking.value
             ? workingColor
             : _plumberController.isOnline.value
             ? onlineColor
             : offlineColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.2),
@@ -82,10 +86,10 @@ class PlumberDashboard extends StatelessWidget {
                 : _plumberController.isOnline.value
                 ? Icons.wifi
                 : Icons.wifi_off,
-            size: 16,
+            size: 14,
             color: Colors.white,
           ),
-          SizedBox(width: 6),
+          SizedBox(width: 4),
           Text(
             _plumberController.isWorking.value
                 ? 'Working'
@@ -95,10 +99,68 @@ class PlumberDashboard extends StatelessWidget {
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w600,
-              fontSize: 12,
+              fontSize: 11,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFaceVerificationIndicator() {
+    return GestureDetector(
+      onTap: () {
+        if (!_plumberController.isFaceVerified.value) {
+          Get.defaultDialog(
+            title: 'Identity Verification Required',
+            content: Text('You need to verify your identity to go online and receive job requests.'),
+            textConfirm: 'Verify Now',
+            textCancel: 'Later',
+            onConfirm: () {
+              Get.back();
+              _plumberController.verifyUserIdentity();
+            },
+          );
+        }
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: _plumberController.isFaceVerified.value
+              ? verifiedColor
+              : unverifiedColor,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 4,
+              offset: Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _plumberController.isFaceVerified.value
+                  ? Icons.verified_user
+                  : Icons.face_unlock_outlined,
+              size: 12,
+              color: Colors.white,
+            ),
+            SizedBox(width: 4),
+            Text(
+              _plumberController.isFaceVerified.value
+                  ? 'Verified'
+                  : 'Verify',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -133,7 +195,7 @@ class PlumberDashboard extends StatelessWidget {
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.chat),
-              activeIcon: Icon(Icons.notifications),
+              activeIcon: Icon(Icons.chat),
               label: 'Chat',
             ),
             BottomNavigationBarItem(
@@ -149,24 +211,12 @@ class PlumberDashboard extends StatelessWidget {
 
   final List<Widget> _pages = [
     PlumberHomeContent(),
-    NotificationsScreen(),
+    ChatListScreen(), // Changed from NotificationsScreen to ChatListScreen
     ProfileScreen(),
   ];
 
   void _onItemTapped(int index, BuildContext context) {
-    if (index == 1) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => ChatListScreen()),
-      );
-    } else if (index == 2) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => ProfileScreen()),
-      );
-    } else {
-      _dashboardController.updateTabIndex(index);
-    }
+    _dashboardController.updateTabIndex(index);
   }
 }
 
@@ -179,6 +229,10 @@ class PlumberHomeContent extends StatelessWidget {
       padding: const EdgeInsets.all(20.0),
       child: Column(
         children: [
+          // Face Verification Status - ADD THIS
+          Obx(() => _buildFaceVerificationBanner()),
+          SizedBox(height: 12),
+
           // Online/Offline Toggle Button
           Obx(() => _buildStatusToggleButton()),
           SizedBox(height: 16),
@@ -250,6 +304,91 @@ class PlumberHomeContent extends StatelessWidget {
     );
   }
 
+  // ADD THIS: Face verification banner
+  Widget _buildFaceVerificationBanner() {
+    if (_controller.isFaceVerified.value) {
+      return Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: verifiedColor.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: verifiedColor),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.verified_user, color: verifiedColor, size: 20),
+            SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Identity Verified',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    'You can go online and receive job requests',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      return GestureDetector(
+        onTap: () => _controller.verifyUserIdentity(),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: unverifiedColor.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: unverifiedColor),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.warning_amber, color: unverifiedColor, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Verify Your Identity',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'Tap to verify your identity and go online',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios, color: unverifiedColor, size: 16),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildLastCheckedTime() {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -293,7 +432,19 @@ class PlumberHomeContent extends StatelessWidget {
 
   Widget _buildStatusToggleButton() {
     return GestureDetector(
-      onTap: _controller.toggleOnlineStatus,
+      onTap: () {
+        if (!_controller.isFaceVerified.value && !_controller.isOnline.value) {
+          Get.snackbar(
+            'Verification Required',
+            'Please verify your identity first to go online',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+          );
+          return;
+        }
+        _controller.toggleOnlineStatus();
+      },
       child: Container(
         width: double.infinity,
         padding: EdgeInsets.symmetric(vertical: 18, horizontal: 24),
@@ -301,7 +452,9 @@ class PlumberHomeContent extends StatelessWidget {
           gradient: LinearGradient(
             colors: _controller.isOnline.value
                 ? [offlineColor, Colors.redAccent]
-                : [onlineColor, Colors.greenAccent],
+                : _controller.isFaceVerified.value
+                ? [onlineColor, Colors.greenAccent]
+                : [Colors.grey, Colors.grey.shade700],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -310,7 +463,9 @@ class PlumberHomeContent extends StatelessWidget {
             BoxShadow(
               color: _controller.isOnline.value
                   ? offlineColor.withOpacity(0.4)
-                  : onlineColor.withOpacity(0.4),
+                  : _controller.isFaceVerified.value
+                  ? onlineColor.withOpacity(0.4)
+                  : Colors.grey.withOpacity(0.4),
               offset: Offset(0, 6),
               blurRadius: 12,
               spreadRadius: 1,
@@ -323,15 +478,23 @@ class PlumberHomeContent extends StatelessWidget {
             Obx(() => AnimatedSwitcher(
               duration: Duration(milliseconds: 300),
               child: Icon(
-                _controller.isOnline.value ? Icons.wifi_off : Icons.wifi,
-                key: ValueKey(_controller.isOnline.value),
+                _controller.isOnline.value
+                    ? Icons.wifi_off
+                    : _controller.isFaceVerified.value
+                    ? Icons.wifi
+                    : Icons.lock,
+                key: ValueKey('${_controller.isOnline.value}_${_controller.isFaceVerified.value}'),
                 color: Colors.white,
                 size: 24,
               ),
             )),
             SizedBox(width: 12),
             Obx(() => Text(
-              _controller.isOnline.value ? 'Go Offline' : 'Go Online',
+              _controller.isOnline.value
+                  ? 'Go Offline'
+                  : _controller.isFaceVerified.value
+                  ? 'Go Online'
+                  : 'Verify to Go Online',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 18,
@@ -339,7 +502,7 @@ class PlumberHomeContent extends StatelessWidget {
                 letterSpacing: 0.5,
               ),
             )),
-            Obx(() => _controller.isLoading.value
+            Obx(() => _controller.isLoading.value || _controller.isVerifyingFace.value
                 ? Padding(
               padding: EdgeInsets.only(left: 12),
               child: SizedBox(

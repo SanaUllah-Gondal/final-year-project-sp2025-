@@ -756,21 +756,21 @@ class UserAppointmentsController extends GetxController {
 
   // Helper method to format price safely
   String formatPrice(dynamic price) {
-    if (price == null) return '\$0.00';
+    if (price == null) return "RPS:0.00";
 
     if (price is String) {
       final numericValue = double.tryParse(price);
       if (numericValue != null) {
-        return '\$${numericValue.toStringAsFixed(2)}';
+        return 'RPS:${numericValue.toStringAsFixed(2)}';
       }
-      return '\$$price';
+      return 'RPS:$price';
     } else if (price is int) {
-      return '\$${price.toDouble().toStringAsFixed(2)}';
+      return 'RPS:${price.toDouble().toStringAsFixed(2)}';
     } else if (price is double) {
-      return '\$${price.toStringAsFixed(2)}';
+      return 'RPS:${price.toStringAsFixed(2)}';
     }
 
-    return '\$0.00';
+    return 'RPS:0.00';
   }
 
   // Navigate to chat screen

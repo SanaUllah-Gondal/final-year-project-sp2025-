@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:plumber_project/controllers/dashboard_controller.dart';
+import 'package:plumber_project/pages/chat_list.dart';
 import 'package:plumber_project/pages/cleaner/controllers/cleaner_dashboard_controller.dart';
 import 'package:plumber_project/pages/cleaner/cleaner_widgets/cleaner_card.dart';
 import 'package:plumber_project/pages/users/profile.dart';
@@ -156,7 +157,7 @@ class CleanerDashboard extends StatelessWidget {
     if (index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => NotificationsScreen()),
+        MaterialPageRoute(builder: (context) => ChatListScreen()),
       );
     } else if (index == 2) {
       Navigator.push(

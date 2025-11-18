@@ -7,6 +7,7 @@ import 'package:plumber_project/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../pages/Apis.dart';
 
+
 class ApiService extends GetxService {
   final StorageService _storageService = Get.find();
   final bool debugMode = true;
@@ -765,7 +766,7 @@ class ApiService extends GetxService {
   // Get my cleaner profile
   Future<Map<String, dynamic>> getMyCleanerProfile() async {
     try {
-      return await get('/api/cleaner/profiles/my');
+      return await get('/api/cleaner/profile/my');
     } catch (e) {
       _log('Get my cleaner profile error: $e');
       rethrow;
@@ -775,7 +776,7 @@ class ApiService extends GetxService {
   // Check if plumber profile exists (protected)
   Future<Map<String, dynamic>> checkPlumberProfileExists() async {
     try {
-      return await get('/api/profiles/check-plumber');
+      return await get('/api/profile/check-plumber');
     } catch (e) {
       _log('Check plumber profile error: $e');
       rethrow;

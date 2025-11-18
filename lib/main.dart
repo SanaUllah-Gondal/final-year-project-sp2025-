@@ -8,6 +8,7 @@ import 'package:plumber_project/pages/authentication/auth_service.dart';
 import 'package:plumber_project/pages/theme.dart';
 import 'package:plumber_project/routes/app_pages.dart';
 import 'package:plumber_project/services/api_service.dart';
+import 'package:plumber_project/services/face_recognization_service.dart';
 import 'package:plumber_project/services/firebas_service.dart';
 import 'package:plumber_project/services/storage_service.dart';
 import '../../../app_binding.dart';
@@ -211,7 +212,7 @@ Future<void> main() async {
     Get.put<ApiService>(ApiService(), permanent: true);
     Get.put<AuthService>(AuthService(), permanent: true);
     Get.put(FirebaseService());
-
+    Get.lazyPut(() => FaceRecognitionService(), fenix: true);
     // Initialize controllers
     debugPrint('Initializing controllers...');
     Get.put<AuthController>(AuthController(), permanent: true);

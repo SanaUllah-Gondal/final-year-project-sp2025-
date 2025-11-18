@@ -39,6 +39,8 @@ dependencies:
   geolocator: ^14.0.0
   geocoding: ^3.0.0
   google_maps_flutter: ^2.12.2
+  firebase_ml_model_downloader:
+  google_mlkit_face_detection:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -74,6 +76,7 @@ dependencies:
   stream_chat_flutter: ^9.18.0
   emoji_picker_flutter: ^4.3.0
   table_calendar: ^3.2.0
+
   
 
 dev_dependencies:
@@ -113,6 +116,8 @@ flutter:
       - assets/animation/finding_providers.json
       - assets/images/
       - assets/icons/
+
+
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

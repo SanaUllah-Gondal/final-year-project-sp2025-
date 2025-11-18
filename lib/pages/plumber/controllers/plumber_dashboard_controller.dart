@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,9 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:plumber_project/services/api_service.dart';
 import 'package:plumber_project/services/storage_service.dart';
 import 'package:plumber_project/models/user_location.dart';
+import 'package:plumber_project/services/face_recognization_service.dart'; // Add this import
 import '../../../notification/fcm_service.dart';
 import '../../../notification/notification_service.dart';
 import '../../../widgets/app_color.dart';
@@ -16,13 +19,18 @@ import '../../chat_screen.dart';
 class PlumberDashboardController extends GetxController {
   final ApiService _apiService = Get.find<ApiService>();
   final StorageService _storageService = Get.find<StorageService>();
+  final FaceRecognitionService _faceService = Get.find<FaceRecognitionService>(); // Add this
   final NotificationService notificationService = Get.find<NotificationService>();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final ImagePicker _imagePicker = ImagePicker(); // Add this
 
   // Observable variables
   var isOnline = false.obs;
   var isWorking = false.obs;
   var isLoading = false.obs;
   var isLocationLoading = false.obs;
+  var isVerifyingFace = false.obs; // Add this
   var errorMessage = ''.obs;
   var userId = 0.obs;
   var userEmail = ''.obs;
@@ -34,8 +42,253 @@ class PlumberDashboardController extends GetxController {
   var hasPendingRequests = false.obs;
   var appointments = [].obs;
   var pendingRequestCount = 0.obs;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Face verification variables - ADD THESE
+  var faceVerificationStatus = ''.obs;
+  var isFaceVerified = false.obs;
+  var faceVerificationScore = 0.0.obs;
+
+  // Location variables
+  var userLocation = UserLocation(
+    latitude: 0.0,
+    longitude: 0.0,
+    address: 'Location not available',
+  ).obs;
+
+  var currentAddressName = 'Location not available'.obs;
+  var currentLatitude = 0.0.obs;
+  var currentLongitude = 0.0.obs;
+
+  // Location stream
+  StreamSubscription<Position>? _positionStreamSubscription;
+  var isTrackingLocation = false.obs;
+
+  // Real-time monitoring
+  Timer? _requestMonitorTimer;
+  var lastCheckedTime = DateTime.now().obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _initializeController();
+  }
+
+  @override
+  void onClose() {
+    _stopLocationTracking();
+    _stopRequestMonitoring();
+    super.onClose();
+  }
+
+  Future<void> _initializeController() async {
+    try {
+      debugPrint('[PlumberDashboardController] Initializing...');
+
+      // Load user data first
+      await _loadUserData();
+
+      // Initialize device token and FCM services
+      await _initializeDeviceToken();
+
+      // Load initial status and appointments
+      await _loadInitialStatus();
+      await loadAppointments();
+
+      // Check face verification status
+      await checkFaceVerificationStatus();
+
+      // Start real-time request monitoring
+      _startRequestMonitoring();
+
+      debugPrint('[PlumberDashboardController] Initialization complete');
+    } catch (e) {
+      debugPrint('[PlumberDashboardController] Error initializing: $e');
+    }
+  }
+
+  // ADD FACE VERIFICATION METHODS
+  Future<bool> verifyUserIdentity() async {
+    try {
+      isVerifyingFace.value = true;
+      faceVerificationStatus.value = 'Starting identity verification...';
+
+      // Show image source selection
+      final imageSource = await _showImageSourceDialog();
+      if (imageSource == null) {
+        faceVerificationStatus.value = 'Verification cancelled';
+        return false;
+      }
+
+      // Capture image
+      final verificationImage = await _captureVerificationImage(imageSource);
+      if (verificationImage == null) {
+        faceVerificationStatus.value = 'No image selected';
+        return false;
+      }
+
+      // Analyze face in the image
+      faceVerificationStatus.value = 'Analyzing facial features...';
+      final results = await _faceService.analyzeFaces(verificationImage);
+
+      if (results.isEmpty) {
+        faceVerificationStatus.value = 'No face detected. Please try again.';
+        return false;
+      }
+
+      if (results.length > 1) {
+        faceVerificationStatus.value = 'Multiple faces detected. Please use an image with only your face.';
+        return false;
+      }
+
+      // Get stored face data from Firebase
+      final storedFaceData = await _getStoredFaceData();
+      if (storedFaceData == null) {
+        faceVerificationStatus.value = 'No face data found in system. Please update your profile.';
+        return false;
+      }
+
+      // Compare faces
+      faceVerificationStatus.value = 'Comparing with stored profile...';
+      final verificationResult = results.first;
+      final storedEmbedding = List<double>.from(storedFaceData['faceEmbedding'] as List);
+      final currentEmbedding = verificationResult.embedding;
+
+      final similarity = _faceService.calculateSimilarity(currentEmbedding, storedEmbedding);
+      faceVerificationScore.value = similarity;
+
+      // Set threshold for verification (adjust as needed)
+      final verificationThreshold = 0.7;
+      final isVerified = similarity >= verificationThreshold;
+
+      if (isVerified) {
+        faceVerificationStatus.value = 'Identity verified successfully!';
+        isFaceVerified.value = true;
+
+        // Log verification event
+        await _logVerificationEvent(true, similarity);
+
+        Get.snackbar(
+          'Verification Successful',
+          'Identity verified with ${(similarity * 100).toStringAsFixed(1)}% match',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      } else {
+        faceVerificationStatus.value = 'Identity verification failed. Please try again.';
+        isFaceVerified.value = false;
+
+        // Log verification event
+        await _logVerificationEvent(false, similarity);
+
+        Get.snackbar(
+          'Verification Failed',
+          'Face match only ${(similarity * 100).toStringAsFixed(1)}%. Please try again.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+
+      return isVerified;
+    } catch (e) {
+      faceVerificationStatus.value = 'Verification error: $e';
+      debugPrint('Face verification error: $e');
+      return false;
+    } finally {
+      isVerifyingFace.value = false;
+    }
+  }
+
+  Future<ImageSource?> _showImageSourceDialog() async {
+    return await Get.dialog<ImageSource>(
+      AlertDialog(
+        title: Text('Identity Verification'),
+        content: Text('Please verify your identity to go online. Choose image source:'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: ImageSource.camera),
+            child: Text('Camera'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: ImageSource.gallery),
+            child: Text('Gallery'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: null),
+            child: Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<File?> _captureVerificationImage(ImageSource source) async {
+    try {
+      final pickedFile = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+        preferredCameraDevice: source == ImageSource.camera
+            ? CameraDevice.front
+            : CameraDevice.rear,
+      );
+
+      if (pickedFile != null) {
+        return File(pickedFile.path);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error capturing image: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _getStoredFaceData() async {
+    try {
+      final userEmail = _auth.currentUser?.email;
+      if (userEmail == null) return null;
+
+      final doc = await _firestore.collection('faces').doc(userEmail).get();
+      if (doc.exists) {
+        return doc.data();
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting stored face data: $e');
+      return null;
+    }
+  }
+
+  Future<void> _logVerificationEvent(bool success, double score) async {
+    try {
+      final userEmail = _auth.currentUser?.email;
+      if (userEmail == null) return;
+
+      await _firestore.collection('verification_logs').add({
+        'userEmail': userEmail,
+        'success': success,
+        'score': score,
+        'timestamp': FieldValue.serverTimestamp(),
+        'platform': 'plumber_app',
+        'role': 'plumber',
+      });
+    } catch (e) {
+      debugPrint('Error logging verification: $e');
+    }
+  }
+
+  Future<bool> checkFaceVerificationStatus() async {
+    try {
+      final storedFaceData = await _getStoredFaceData();
+      isFaceVerified.value = storedFaceData != null;
+      return isFaceVerified.value;
+    } catch (e) {
+      debugPrint('Error checking face verification status: $e');
+      return false;
+    }
+  }
 
   Future<void> openOrCreateChat({
     required String userEmail,
@@ -44,8 +297,6 @@ class PlumberDashboardController extends GetxController {
   }) async {
     try {
       final currentUser =  _auth.currentUser!;
-
-
       final currentUserEmail = currentUser.email!;
       final currentUserName = currentUser.displayName ?? 'Plumber';
 
@@ -96,61 +347,6 @@ class PlumberDashboardController extends GetxController {
         backgroundColor: AppColors.errorColor,
         colorText: Colors.white,
       );
-    }
-  }
-
-  // Location variables
-  var userLocation = UserLocation(
-    latitude: 0.0,
-    longitude: 0.0,
-    address: 'Location not available',
-  ).obs;
-
-  var currentAddressName = 'Location not available'.obs;
-  var currentLatitude = 0.0.obs;
-  var currentLongitude = 0.0.obs;
-
-  // Location stream
-  StreamSubscription<Position>? _positionStreamSubscription;
-  var isTrackingLocation = false.obs;
-
-  // Real-time monitoring
-  Timer? _requestMonitorTimer;
-  var lastCheckedTime = DateTime.now().obs;
-
-  @override
-  void onInit() {
-    super.onInit();
-    _initializeController();
-  }
-
-  @override
-  void onClose() {
-    _stopLocationTracking();
-    _stopRequestMonitoring();
-    super.onClose();
-  }
-
-  Future<void> _initializeController() async {
-    try {
-      debugPrint('[PlumberDashboardController] Initializing...');
-
-      // Load user data first
-      await _loadUserData();
-
-      // Initialize device token and FCM services
-      await _initializeDeviceToken();
-
-      // Load initial status and appointments
-      await _loadInitialStatus();
-      await loadAppointments();
-
-      // Start real-time request monitoring
-      _startRequestMonitoring();
-
-      debugPrint('[PlumberDashboardController] Initialization complete');
-    } catch (e) {
-      debugPrint('[PlumberDashboardController] Error initializing: $e');
     }
   }
 
@@ -431,11 +627,26 @@ class PlumberDashboardController extends GetxController {
     }
   }
 
+  // UPDATED toggleOnlineStatus with face verification
   Future<void> toggleOnlineStatus() async {
     try {
       isLoading.value = true;
 
+      // If going online, verify identity first
       if (!isOnline.value) {
+        final isVerified = await verifyUserIdentity();
+        if (!isVerified) {
+          isLoading.value = false;
+          Get.snackbar(
+            'Verification Required',
+            'Please verify your identity to go online',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+          );
+          return;
+        }
+
         await getLiveLocation();
         await startLocationTracking();
         _startRequestMonitoring(); // Start monitoring when going online
@@ -575,6 +786,7 @@ class PlumberDashboardController extends GetxController {
   Future<void> refreshData() async {
     await _loadInitialStatus();
     await loadAppointments();
+    await checkFaceVerificationStatus();
   }
 
   // Manual check for new requests
@@ -586,5 +798,12 @@ class PlumberDashboardController extends GetxController {
       snackPosition: SnackPosition.BOTTOM,
       duration: Duration(seconds: 1),
     );
+  }
+
+  // Method to reset face verification (for testing or re-verification)
+  void resetFaceVerification() {
+    isFaceVerified.value = false;
+    faceVerificationScore.value = 0.0;
+    faceVerificationStatus.value = '';
   }
 }

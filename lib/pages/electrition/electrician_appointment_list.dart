@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:photo_view/photo_view.dart';
@@ -6,7 +7,6 @@ import 'package:plumber_project/services/api_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:convert';
 import '../../notification/notification_helper.dart';
 import '../../widgets/app_color.dart';
 import '../../widgets/app_text_style.dart';
@@ -482,6 +482,14 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
     );
   }
 
+  // Helper method to safely convert image data to base64 string
+  String? _convertImageToBase64(dynamic image) {
+    if (image == null) return null;
+    if (image is String) return image;
+    if (image is Uint8List) return base64.encode(image);
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -942,7 +950,7 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
                             child: OutlinedButton.icon(
                               onPressed: () {
                                 final userName = user['name'] ?? 'Customer';
-                                final userImage = profileImageUrl ?? profileImageBytes;
+                                final userImage = _convertImageToBase64(profileImageUrl ?? profileImageBytes);
                                 _controller.openOrCreateChat(
                                   userEmail: userEmail!,
                                   userName: userName,
@@ -975,7 +983,7 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
                         child: ElevatedButton.icon(
                           onPressed: () {
                             final userName = user['name'] ?? 'Customer';
-                            final userImage = profileImageUrl ?? profileImageBytes;
+                            final userImage = _convertImageToBase64(profileImageUrl ?? profileImageBytes);
                             _controller.openOrCreateChat(
                               userEmail: userEmail!,
                               userName: userName,

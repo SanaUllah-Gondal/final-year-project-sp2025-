@@ -8,6 +8,7 @@ import 'package:plumber_project/pages/electrition/controllers/electrician_dashbo
 import 'package:plumber_project/pages/plumber/controllers/plumber_dashboard_controller.dart';
 import 'package:plumber_project/pages/users/controllers/user_dashboard_controller.dart';
 import 'package:plumber_project/services/api_service.dart';
+import 'package:plumber_project/services/face_recognization_service.dart';
 import 'package:plumber_project/services/storage_service.dart';
 
 class AppBindings extends Bindings {
@@ -67,6 +68,7 @@ class AppBindings extends Bindings {
       Get.put<AuthService>(AuthService(), permanent: true);
       Get.put<StorageService>(StorageService(), permanent: true);
       Get.put<AuthController>(AuthController(), permanent: true);
+
     } catch (e) {
       debugPrint('Error in fallback service initialization: $e');
     }
@@ -79,6 +81,7 @@ class AppBindings extends Bindings {
       Get.lazyPut(() => CleanerDashboardController(), fenix: true);
       Get.lazyPut(() => ElectricianDashboardController(), fenix: true);
       Get.lazyPut(() => HomeController(), fenix: true);
+      Get.lazyPut(() => FaceRecognitionService(), fenix: true);
     } catch (e) {
       debugPrint('Error registering lazy controllers: $e');
     }

@@ -16,6 +16,8 @@ import 'package:email_validator/email_validator.dart';
 
 import '../../../controllers/auth_controller.dart';
 import '../../../routes/app_pages.dart';
+
+import '../../../services/face_recognization_service.dart';
 import '../../Apis.dart';
 
 class UserLocation {
@@ -52,8 +54,18 @@ class CleanerProfileController extends GetxController {
   final RxString successMessage = ''.obs;
   final RxString debugLog = ''.obs;
 
-  // Constants
+  // Face recognition variables
+  final FaceRecognitionService faceService = Get.find<FaceRecognitionService>();
+  final RxList<double> faceEmbedding = <double>[].obs;
+  final RxBool isFaceDetected = false.obs;
+  final RxString faceStatus = ''.obs;
+  final RxList<FaceAnalysisResult> faceResults = <FaceAnalysisResult>[].obs;
+  final RxMap<String, dynamic> faceDetails = <String, dynamic>{}.obs;
 
+  // Image picker
+  final ImagePicker _imagePicker = ImagePicker();
+
+  // Constants
   final Color darkBlue = const Color(0xFF003E6B);
   final Color tealBlue = const Color(0xFF00A8A8);
 
@@ -114,11 +126,9 @@ class CleanerProfileController extends GetxController {
       };
 
       if (files != null || method == 'POST' || method == 'PUT') {
-        // Always use multipart for create/update requests
         final request = http.MultipartRequest(method, Uri.parse(url));
         request.headers.addAll(headers);
 
-        // Add text fields
         if (body != null) {
           body.forEach((key, value) {
             if (value != null) {
@@ -127,7 +137,6 @@ class CleanerProfileController extends GetxController {
           });
         }
 
-        // Add files
         if (files != null) {
           request.files.addAll(files);
         }
@@ -135,7 +144,6 @@ class CleanerProfileController extends GetxController {
         final streamed = await request.send();
         return await http.Response.fromStream(streamed);
       } else {
-        // For GET requests
         return await http.get(
           Uri.parse(url),
           headers: headers,
@@ -273,9 +281,40 @@ class CleanerProfileController extends GetxController {
     }
   }
 
+  // Updated pickImage method with camera support
   Future<void> pickImage() async {
     try {
-      final pickedFile = await ImagePicker().pickImage(
+      // Show option dialog for camera or gallery
+      Get.dialog(
+        AlertDialog(
+          title: Text('Choose Image Source'),
+          content: Text('Select where to get your profile picture from'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Get.back();
+                _pickImageFromGallery();
+              },
+              child: Text('Gallery'),
+            ),
+            TextButton(
+              onPressed: () {
+                Get.back();
+                _pickImageFromCamera();
+              },
+              child: Text('Camera'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      errorMessage.value = "Image pick error: $e";
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final pickedFile = await _imagePicker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 800,
         maxHeight: 800,
@@ -284,10 +323,90 @@ class CleanerProfileController extends GetxController {
 
       if (pickedFile != null) {
         profileImage.value = File(pickedFile.path);
+        await processProfileImageForFace();
       }
     } catch (e) {
-      errorMessage.value = "Image pick error: $e";
+      errorMessage.value = "Gallery pick error: $e";
     }
+  }
+
+  Future<void> _pickImageFromCamera() async {
+    try {
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+        preferredCameraDevice: CameraDevice.front,
+      );
+
+      if (pickedFile != null) {
+        profileImage.value = File(pickedFile.path);
+        await processProfileImageForFace();
+      }
+    } catch (e) {
+      errorMessage.value = "Camera error: $e";
+    }
+  }
+
+  Future<void> processProfileImageForFace() async {
+    try {
+      if (profileImage.value == null) return;
+
+      faceStatus.value = 'Analyzing facial features...';
+
+      final results = await faceService.analyzeFaces(profileImage.value!);
+
+      if (results.isEmpty) {
+        faceStatus.value = 'No face detected in the image';
+        isFaceDetected.value = false;
+        return;
+      }
+
+      if (results.length > 1) {
+        faceStatus.value = 'Multiple faces detected. Please use an image with only one face.';
+        isFaceDetected.value = false;
+        return;
+      }
+
+      final result = results.first;
+      faceResults.value = results;
+      faceDetails.value = faceService.getFaceDetails(result);
+
+      // Use basic embedding from face geometry
+      faceEmbedding.value = result.embedding;
+      isFaceDetected.value = true;
+
+      faceStatus.value = _generateFaceStatusMessage(result);
+
+      _logDebug('Face analysis completed: ${result.features.length} features detected');
+
+    } catch (e) {
+      faceStatus.value = 'Face analysis failed: $e';
+      isFaceDetected.value = false;
+      _logDebug('Face analysis error: $e');
+    }
+  }
+
+
+  String _generateFaceStatusMessage(FaceAnalysisResult result) {
+    final buffer = StringBuffer();
+    buffer.writeln('✅ Face detected and analyzed');
+
+    if (result.expressions['smiling'] != null) {
+      final smileProb = result.expressions['smiling']!;
+      buffer.writeln('${smileProb > 0.5 ? '😊' : '😐'} Smiling: ${(smileProb * 100).toStringAsFixed(1)}%');
+    }
+
+    if (result.expressions['left_eye_open'] != null && result.expressions['right_eye_open'] != null) {
+      final leftEye = result.expressions['left_eye_open']!;
+      final rightEye = result.expressions['right_eye_open']!;
+      buffer.writeln('👀 Eyes open: L${(leftEye * 100).toStringAsFixed(0)}% R${(rightEye * 100).toStringAsFixed(0)}%');
+    }
+
+    buffer.writeln('📊 Features detected: ${result.features.length}');
+
+    return buffer.toString();
   }
 
   Future<void> submitProfile() async {
@@ -302,6 +421,11 @@ class CleanerProfileController extends GetxController {
         throw Exception(errors.values.join("\n"));
       }
 
+      // Only require face detection for new profiles
+      if (!profileExists.value && !isFaceDetected.value) {
+        throw Exception('Please upload a clear photo with your face for identity verification');
+      }
+
       if (bearerToken.isEmpty) {
         await refreshToken();
         if (bearerToken.isEmpty) {
@@ -313,14 +437,13 @@ class CleanerProfileController extends GetxController {
       final url = isUpdate ? '$baseUrl/api/cleaner/profile' : '$baseUrl/api/cleaner/profile';
       final method = isUpdate ? 'PUT' : 'POST';
 
-      // Convert all values to strings
       final fields = {
         'full_name': nameController.text.trim(),
         'email': emailController.text.trim(),
         'experience': experienceController.text.trim(),
         'skill': skillsController.text.trim(),
         'service_area': areaController.text.trim(),
-        'hourly_rate': rateController.text.trim(), // Keep as string
+        'hourly_rate': rateController.text.trim(),
         'contact_number': contactController.text.trim(),
         if (userLocation.value != null) ...{
           'latitude': userLocation.value!.latitude.toString(),
@@ -353,11 +476,16 @@ class CleanerProfileController extends GetxController {
         final responseData = json.decode(response.body);
         successMessage.value = responseData['message'] ??
             (isUpdate ? 'Profile updated successfully' : 'Profile created successfully');
-       try {
-         await saveCleanerProfileToCloud();
-       }catch (e) {
-         _logDebug('Firebase backup failed: $e');
-       }
+
+        try {
+          await saveCleanerProfileToCloud();
+          if (isFaceDetected.value && faceEmbedding.isNotEmpty) {
+            await saveFaceDataToFirebase();
+          }
+        } catch (e) {
+          _logDebug('Firebase backup failed: $e');
+        }
+
         Get.toNamed(AppRoutes.CLEANER_DASHBOARD);
         final authController = Get.find<AuthController>();
         authController.hasProfile.value = true;
@@ -369,7 +497,6 @@ class CleanerProfileController extends GetxController {
           profileExists.value = true;
         }
       } else if (response.statusCode == 422) {
-        // Handle validation errors
         final errorData = json.decode(response.body);
         final errorMessages = [];
 
@@ -393,13 +520,102 @@ class CleanerProfileController extends GetxController {
     }
   }
 
+  Future<void> saveFaceDataToFirebase() async {
+    try {
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) throw Exception('User not authenticated');
+      if (faceResults.isEmpty) return;
+
+      final result = faceResults.first;
+      final userEmail = emailController.text.trim();
+
+      final faceData = {
+        'userId': user.uid,
+        'userEmail': userEmail,
+        'faceEmbedding': faceEmbedding,
+        'facialFeatures': _serializeFeatures(result.features),
+        'expressions': result.expressions,
+        'faceDetails': faceDetails.value,
+        'fullName': nameController.text.trim(),
+        'profileImageUrl': '',
+        'analysisTimestamp': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'isActive': true,
+        'verificationStatus': 'pending',
+      };
+
+      await firestore.collection('faces').doc(userEmail).set(faceData, SetOptions(merge: true));
+
+      _logDebug('Face data saved to Firebase successfully for user: $userEmail');
+
+    } catch (e) {
+      _logDebug('Error saving face data to Firebase: $e');
+      throw Exception('Failed to save face data: $e');
+    }
+  }
+
+  Map<String, dynamic> _serializeFeatures(Map<String, FacialFeature> features) {
+    return features.map((key, feature) => MapEntry(key, {
+      'points': feature.points.map((point) => {'x': point.x, 'y': point.y}).toList(),
+      'centerPoint': feature.centerPoint != null ?
+      {'x': feature.centerPoint!.x, 'y': feature.centerPoint!.y} : null,
+    }));
+  }
+
+  Future<bool> verifyFace(File imageFile) async {
+    try {
+      final results = await faceService.analyzeFaces(imageFile);
+      if (results.isEmpty) return false;
+
+      final newResult = results.first;
+
+      final firestore = FirebaseFirestore.instance;
+      final userEmail = emailController.text.trim();
+
+      final doc = await firestore.collection('faces').doc(userEmail).get();
+      if (!doc.exists) return false;
+
+      final storedData = doc.data()!;
+      final storedEmbedding = List<double>.from(storedData['faceEmbedding'] as List);
+
+      final similarity = faceService.calculateSimilarity(newResult.embedding, storedEmbedding);
+
+      final isMatch = similarity > 0.7;
+
+      _logDebug('Face verification: similarity=$similarity, match=$isMatch');
+
+      return isMatch;
+    } catch (e) {
+      _logDebug('Face verification failed: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getFaceDataByEmail(String email) async {
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final doc = await firestore.collection('faces').doc(email).get();
+
+      if (doc.exists) {
+        return doc.data();
+      }
+      return null;
+    } catch (e) {
+      _logDebug('Error getting face data: $e');
+      return null;
+    }
+  }
+
   Map<String, String> validateProfileFields() {
     final errors = <String, String>{};
 
     if (nameController.text.isEmpty) {
       errors['name'] = 'Name is required';
-    } else if (nameController.text.length > 100) {
-      errors['name'] = 'Name must be less than 100 characters';
+    } else if (nameController.text.length > 25) {
+      errors['name'] = 'Name must be less than 25 characters';
     }
 
     if (emailController.text.isEmpty) {
@@ -485,25 +701,21 @@ class CleanerProfileController extends GetxController {
       throw Exception('Token refresh error: $e');
     }
   }
+
   Future<void> saveCleanerProfileToCloud() async {
     try {
-      // Get Firestore instance
       final FirebaseFirestore firestore = FirebaseFirestore.instance;
-
-      // Get current user ID
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         throw Exception('User not authenticated');
       }
 
-      // Convert image to base64 string if exists
       String? imageBase64;
       if (profileImage.value != null) {
         final imageBytes = await profileImage.value!.readAsBytes();
         imageBase64 = base64Encode(imageBytes);
       }
 
-      // Prepare cleaner data
       final cleanerData = {
         'userId': user.uid,
         'fullName': nameController.text.trim(),
@@ -513,30 +725,51 @@ class CleanerProfileController extends GetxController {
         'serviceArea': areaController.text.trim(),
         'hourlyRate': double.tryParse(rateController.text.trim()) ?? 0.0,
         'contactNumber': contactController.text.trim(),
-        'profileImage': imageBase64, // Base64 encoded image string
+        'profileImage': imageBase64,
         'location': userLocation.value != null ? {
           'latitude': userLocation.value!.latitude,
           'longitude': userLocation.value!.longitude,
           'address': userLocation.value!.address,
         } : null,
-        'createdAt': FieldValue.serverTimestamp(),
+        'faceEmbedding': isFaceDetected.value ? faceEmbedding : null,
+        'hasFaceData': isFaceDetected.value,
         'updatedAt': FieldValue.serverTimestamp(),
         'role': 'cleaner',
       };
 
-      // Save to Firestore
-      await firestore
+      // Check if document already exists for this email
+      final querySnapshot = await firestore
           .collection('cleaner')
-          .doc(user.uid)
-          .set(cleanerData, SetOptions(merge: true));
+          .where('email', isEqualTo: emailController.text.trim())
+          .limit(1)
+          .get();
 
-      _logDebug('Cleaner profile saved to Firebase successfully');
+      if (querySnapshot.docs.isNotEmpty) {
+        // Document exists - update it
+        final existingDoc = querySnapshot.docs.first;
+        await firestore
+            .collection('cleaner')
+            .doc(existingDoc.id)
+            .set(cleanerData, SetOptions(merge: true));
+
+        _logDebug('Cleaner profile updated in Firebase for email: ${emailController.text.trim()}');
+      } else {
+        // Document doesn't exist - create new with user ID as document ID
+        cleanerData['createdAt'] = FieldValue.serverTimestamp();
+        await firestore
+            .collection('cleaner')
+            .doc(user.uid)
+            .set(cleanerData, SetOptions(merge: true));
+
+        _logDebug('New cleaner profile created in Firebase for user: ${user.uid}');
+      }
 
     } catch (e) {
       _logDebug('Error saving to Firebase: $e');
       throw Exception('Failed to save profile to Firebase: $e');
     }
   }
+
   Future<String> _getToken() async {
     if (bearerToken.isNotEmpty) return bearerToken.value;
     final prefs = await SharedPreferences.getInstance();
