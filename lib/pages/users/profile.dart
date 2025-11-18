@@ -4,12 +4,12 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:plumber_project/pages/chat_list.dart';
 import 'package:plumber_project/pages/cleaner/cleaner_dashboard.dart';
 import 'package:plumber_project/pages/users/dashboard.dart';
 import 'package:plumber_project/pages/electrition/electrition_dashboard.dart';
 import 'package:plumber_project/pages/emergency.dart';
 import 'package:plumber_project/pages/authentication/login.dart';
-import 'package:plumber_project/pages/notification.dart';
 import 'package:plumber_project/pages/plumber/plumber_dashboard.dart';
 import 'package:plumber_project/pages/privacy.dart';
 import 'package:plumber_project/pages/setting.dart';
@@ -40,7 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _experienceController = TextEditingController();
   final TextEditingController _skillsController = TextEditingController();
 
-  final int _selectedIndex = 2;
+  int _selectedIndex = 2; // Profile is selected by default
   String _userName = 'Loading...';
   String _userRole = '';
   String _userId = '';
@@ -226,29 +226,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _skillsController.clear();
     });
     _showSuccessSnackBar('All fields cleared!');
-  }
-
-  void _navigateToDashboard() {
-    Widget dashboard;
-    switch (_userRole) {
-      case 'plumber':
-        dashboard = PlumberDashboard();
-        break;
-      case 'electrician':
-        dashboard = ElectricianDashboard();
-        break;
-      case 'cleaner':
-        dashboard = CleanerDashboard();
-        break;
-      default:
-        dashboard = HomeScreen();
-    }
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => dashboard),
-          (Route<dynamic> route) => false,
-    );
   }
 
   void _showSuccessSnackBar(String message) {
@@ -583,44 +560,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _onItemTapped(int index) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? role = prefs.getString('role') ?? '';
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
 
-    if (index == 1) {
-      if (role == 'plumber' || role == 'electrician' || role == 'cleaner') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => NotificationsScreen()),
-        );
-      } else {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => EmergencyScreen()),
-        );
-      }
-    } else if (index == 2) {
-      // Already on profile screen
-    } else if (index == 0) {
-      Widget homePage;
-      switch (role) {
-        case 'plumber':
-          homePage = PlumberDashboard();
-          break;
-        case 'electrician':
-          homePage = ElectricianDashboard();
-          break;
-        case 'cleaner':
-          homePage = CleanerDashboard();
-          break;
-        default:
-          homePage = HomeScreen();
-      }
+    switch (index) {
+      case 0: // Home
+        _navigateToHome();
+        break;
+      case 1: // Chat/Emergency
+        _navigateToMiddleOption();
+        break;
+      case 2: // Profile - already here
+        break;
+    }
+  }
 
-      Navigator.pushAndRemoveUntil(
+  void _navigateToHome() {
+    Widget homePage;
+    switch (_userRole) {
+      case 'plumber':
+        homePage = PlumberDashboard();
+        break;
+      case 'electrician':
+        homePage = ElectricianDashboard();
+        break;
+      case 'cleaner':
+        homePage = CleanerDashboard();
+        break;
+      default:
+        homePage = HomeScreen();
+    }
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => homePage),
+          (Route<dynamic> route) => false,
+    );
+  }
+
+  void _navigateToMiddleOption() {
+    if (_userRole == 'plumber' || _userRole == 'electrician' || _userRole == 'cleaner') {
+      Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => homePage),
-            (Route<dynamic> route) => false,
+        MaterialPageRoute(builder: (context) => ChatListScreen()),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => EmergencyScreen()),
       );
     }
   }
@@ -802,38 +791,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          child: BottomNavigationBar(
-            backgroundColor: tealBlue,
-            currentIndex: _selectedIndex,
-            selectedItemColor: Colors.yellow,
-            unselectedItemColor: Colors.white.withOpacity(0.7),
-            selectedLabelStyle: TextStyle(fontWeight: FontWeight.bold),
-            onTap: _onItemTapped,
-            items: [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home),
-                label: "Home",
-              ),
-              BottomNavigationBarItem(
-                icon: _userRole == 'plumber' || _userRole == 'electrician' || _userRole == 'cleaner'
-                    ? Icon(Icons.notifications_outlined)
-                    : Icon(Icons.emergency_outlined, color: Colors.red),
-                activeIcon: _userRole == 'plumber' || _userRole == 'electrician' || _userRole == 'cleaner'
-                    ? Icon(Icons.notifications)
-                    : Icon(Icons.emergency, color: Colors.red),
-                label: _userRole == 'plumber' || _userRole == 'electrician' || _userRole == 'cleaner'
-                    ? "Notifications"
-                    : "Emergency",
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                activeIcon: Icon(Icons.person),
-                label: "Profile",
-              ),
-            ],
-          ),
-        ),
+   ),
       ),
     );
   }
@@ -953,7 +911,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await prefs.remove('role');
     await prefs.remove('userId');
     await prefs.setBool('remember_me', false);
-    FirebaseAuth.instance.signOut();
+    await FirebaseAuth.instance.signOut();
 
     Navigator.pushAndRemoveUntil(
       context,
