@@ -434,7 +434,7 @@ class PlumberProfileController extends GetxController {
       }
 
       final isUpdate = profileExists.value;
-      final url = isUpdate ? '$baseUrl/profiles/plumber/me' : '$baseUrl/profiles/plumber';
+      final url = isUpdate ? '$baseUrl/api/profiles/plumber/me' : '$baseUrl/api/profiles/plumber';
       final method = isUpdate ? 'PUT' : 'POST';
 
       final fields = {

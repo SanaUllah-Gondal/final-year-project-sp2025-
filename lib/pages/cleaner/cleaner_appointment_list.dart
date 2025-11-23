@@ -3,17 +3,16 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:photo_view/photo_view.dart';
-import 'package:plumber_project/pages/cleaner/controllers/cleaner_dashboard_controller.dart';
-import 'package:plumber_project/services/api_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../notification/notification_helper.dart';
+import '../../services/api_service.dart';
 import '../../widgets/app_color.dart';
 import '../../widgets/app_text_style.dart';
 import '../../widgets/custom_badge.dart';
 import '../../widgets/loading_shimmer.dart';
-import '../chat_screen.dart';
+import 'controllers/cleaner_dashboard_controller.dart';
 
 class CleanerAppointmentList extends StatefulWidget {
   @override
@@ -25,11 +24,13 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
   final ApiService _apiService = Get.find();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  final List<String> _tabs = ['Pending', 'Confirmed', 'Completed', 'Cancelled'];
+  // Added 'Modified' tab
+  final List<String> _tabs = ['Pending', 'Confirmed', 'Modified', 'Completed', 'Cancelled'];
   var _selectedTab = 0.obs;
   var _isLoading = false.obs;
   var _appointments = [].obs;
   var _hasPendingRequests = false.obs;
+  var _hasModifiedRequests = false.obs;
 
   // Store Firebase user data
   final Map<String, Map<String, dynamic>> _userDataCache = {};
@@ -61,6 +62,7 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
         if (appointmentsData is List) {
           _appointments.value = appointmentsData;
           _checkPendingRequests();
+          _checkModifiedRequests();
 
           // Initialize bid prices - handle both String and numeric values
           for (var appointment in appointmentsData) {
@@ -205,6 +207,12 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
     );
   }
 
+  void _checkModifiedRequests() {
+    _hasModifiedRequests.value = _appointments.any((appt) =>
+    appt['status'] == 'modified'
+    );
+  }
+
   Future<void> _updateAppointmentStatus(String appointmentId, String status) async {
     try {
       _isLoading.value = true;
@@ -266,6 +274,7 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
       );
 
       if (response['success']) {
+        _updateAppointmentStatus(appointmentId, "modified");
         Get.snackbar('Success', 'Bid placed successfully!',
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: AppColors.successColor,
@@ -346,6 +355,8 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
         return AppColors.warningColor;
       case 'confirmed':
         return AppColors.successColor;
+      case 'modified':
+        return AppColors.infoColor; // Different color for modified status
       case 'completed':
         return AppColors.infoColor;
       case 'cancelled':
@@ -361,6 +372,8 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
         return Icons.access_time;
       case 'confirmed':
         return Icons.check_circle;
+      case 'modified':
+        return Icons.edit; // Different icon for modified status
       case 'completed':
         return Icons.done_all;
       case 'cancelled':
@@ -462,7 +475,7 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Cancel'),
+                child: Text('Cancel',style: TextStyle(color: Colors.black)),
               ),
               ElevatedButton(
                 onPressed: () {
@@ -472,21 +485,13 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryColor,
                 ),
-                child: Text('Place Bid'),
+                child: Text('Place Bid', style: TextStyle(color: Colors.black)),
               ),
             ],
           );
         },
       ),
     );
-  }
-
-  // Helper method to safely convert image data to base64 string
-  String? _convertImageToBase64(dynamic image) {
-    if (image == null) return null;
-    if (image is String) return image;
-    if (image is Uint8List) return base64.encode(image);
-    return null;
   }
 
   @override
@@ -502,9 +507,10 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
         elevation: 2,
         shadowColor: AppColors.primaryColor.withOpacity(0.3),
         actions: [
-          Obx(() => _hasPendingRequests.value
+          Obx(() => _hasPendingRequests.value || _hasModifiedRequests.value
               ? CustomBadge(
-            count: _appointments.where((appt) => appt['status'] == 'pending').length,
+            count: _appointments.where((appt) =>
+            appt['status'] == 'pending' || appt['status'] == 'modified').length,
             child: IconButton(
               icon: Icon(Icons.notifications, color: Colors.white),
               onPressed: () {
@@ -541,6 +547,7 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
               children: List.generate(_tabs.length, (index) {
                 final isSelected = _selectedTab.value == index;
                 final hasPending = index == 0 && _hasPendingRequests.value;
+                final hasModified = index == 2 && _hasModifiedRequests.value;
 
                 return Expanded(
                   child: Stack(
@@ -570,7 +577,7 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
                           ),
                         ),
                       ),
-                      if (hasPending && !isSelected)
+                      if ((hasPending && !isSelected) || (hasModified && !isSelected))
                         Positioned(
                           top: 12,
                           right: 12,
@@ -578,7 +585,7 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
                             width: 8,
                             height: 8,
                             decoration: BoxDecoration(
-                              color: AppColors.warningColor,
+                              color: hasPending ? AppColors.warningColor : AppColors.infoColor,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -804,7 +811,7 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
                 if (appointment['description'] != null) ...[
                   SizedBox(height: 12),
                   Text(
-                    'Problem Description:',
+                    'Service Description:',
                     style: AppTextStyles.bodyMedium.copyWith(
                       fontWeight: FontWeight.w600,
                       color: AppColors.darkColor,
@@ -828,7 +835,7 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
                 if (problemImageBytes != null) ...[
                   SizedBox(height: 16),
                   Text(
-                    'Problem Image:',
+                    'Service Image:',
                     style: AppTextStyles.bodyMedium.copyWith(
                       fontWeight: FontWeight.w600,
                       color: AppColors.darkColor,
@@ -949,7 +956,7 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
                             child: OutlinedButton.icon(
                               onPressed: () {
                                 final userName = user['name'] ?? 'Customer';
-                                final userImage = _convertImageToBase64(profileImageUrl ?? profileImageBytes);
+                                final userImage = profileImageUrl ?? profileImageBytes;
                                 _controller.openOrCreateChat(
                                   userEmail: userEmail!,
                                   userName: userName,
@@ -975,6 +982,36 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
                     ],
                   ),
 
+                // For modified status - only show message button
+                if (status == 'modified')
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            final userName = user['name'] ?? 'Customer';
+                            final userImage = profileImageUrl ?? profileImageBytes;
+                            _controller.openOrCreateChat(
+                              userEmail: userEmail!,
+                              userName: userName,
+                              userImage: userImage,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.infoColor,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          icon: Icon(Icons.message, size: 20),
+                          label: Text('Message Customer', style: TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
+                  ),
+
                 if (status == 'confirmed')
                   Row(
                     children: [
@@ -982,7 +1019,7 @@ class _CleanerAppointmentListState extends State<CleanerAppointmentList> {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             final userName = user['name'] ?? 'Customer';
-                            final userImage = _convertImageToBase64(profileImageUrl ?? profileImageBytes);
+                            final userImage = profileImageUrl ?? profileImageBytes;
                             _controller.openOrCreateChat(
                               userEmail: userEmail!,
                               userName: userName,

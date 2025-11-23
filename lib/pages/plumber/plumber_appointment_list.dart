@@ -12,7 +12,6 @@ import '../../widgets/app_color.dart';
 import '../../widgets/app_text_style.dart';
 import '../../widgets/custom_badge.dart';
 import '../../widgets/loading_shimmer.dart';
-import '../chat_screen.dart';
 import 'controllers/plumber_dashboard_controller.dart';
 
 class PlumberAppointmentList extends StatefulWidget {
@@ -25,11 +24,13 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
   final ApiService _apiService = Get.find();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  final List<String> _tabs = ['Pending', 'Confirmed', 'Completed', 'Cancelled'];
+  // Added 'Modified' tab
+  final List<String> _tabs = ['Pending', 'Confirmed', 'Modified', 'Completed', 'Cancelled'];
   var _selectedTab = 0.obs;
   var _isLoading = false.obs;
   var _appointments = [].obs;
   var _hasPendingRequests = false.obs;
+  var _hasModifiedRequests = false.obs;
 
   // Store Firebase user data
   final Map<String, Map<String, dynamic>> _userDataCache = {};
@@ -61,6 +62,7 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
         if (appointmentsData is List) {
           _appointments.value = appointmentsData;
           _checkPendingRequests();
+          _checkModifiedRequests();
 
           // Initialize bid prices - handle both String and numeric values
           for (var appointment in appointmentsData) {
@@ -205,6 +207,12 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
     );
   }
 
+  void _checkModifiedRequests() {
+    _hasModifiedRequests.value = _appointments.any((appt) =>
+    appt['status'] == 'modified'
+    );
+  }
+
   Future<void> _updateAppointmentStatus(String appointmentId, String status) async {
     try {
       _isLoading.value = true;
@@ -266,6 +274,7 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
       );
 
       if (response['success']) {
+        _updateAppointmentStatus(appointmentId, "modified");
         Get.snackbar('Success', 'Bid placed successfully!',
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: AppColors.successColor,
@@ -346,6 +355,8 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
         return AppColors.warningColor;
       case 'confirmed':
         return AppColors.successColor;
+      case 'modified':
+        return AppColors.infoColor; // Different color for modified status
       case 'completed':
         return AppColors.infoColor;
       case 'cancelled':
@@ -361,6 +372,8 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
         return Icons.access_time;
       case 'confirmed':
         return Icons.check_circle;
+      case 'modified':
+        return Icons.edit; // Different icon for modified status
       case 'completed':
         return Icons.done_all;
       case 'cancelled':
@@ -462,7 +475,7 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Cancel'),
+                child: Text('Cancel',style: TextStyle(color: Colors.black)),
               ),
               ElevatedButton(
                 onPressed: () {
@@ -472,7 +485,7 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryColor,
                 ),
-                child: Text('Place Bid'),
+                child: Text('Place Bid', style: TextStyle(color: Colors.black)),
               ),
             ],
           );
@@ -494,9 +507,10 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
         elevation: 2,
         shadowColor: AppColors.primaryColor.withOpacity(0.3),
         actions: [
-          Obx(() => _hasPendingRequests.value
+          Obx(() => _hasPendingRequests.value || _hasModifiedRequests.value
               ? CustomBadge(
-            count: _appointments.where((appt) => appt['status'] == 'pending').length,
+            count: _appointments.where((appt) =>
+            appt['status'] == 'pending' || appt['status'] == 'modified').length,
             child: IconButton(
               icon: Icon(Icons.notifications, color: Colors.white),
               onPressed: () {
@@ -533,6 +547,7 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
               children: List.generate(_tabs.length, (index) {
                 final isSelected = _selectedTab.value == index;
                 final hasPending = index == 0 && _hasPendingRequests.value;
+                final hasModified = index == 2 && _hasModifiedRequests.value;
 
                 return Expanded(
                   child: Stack(
@@ -562,7 +577,7 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
                           ),
                         ),
                       ),
-                      if (hasPending && !isSelected)
+                      if ((hasPending && !isSelected) || (hasModified && !isSelected))
                         Positioned(
                           top: 12,
                           right: 12,
@@ -570,7 +585,7 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
                             width: 8,
                             height: 8,
                             decoration: BoxDecoration(
-                              color: AppColors.warningColor,
+                              color: hasPending ? AppColors.warningColor : AppColors.infoColor,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -963,6 +978,36 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
                             ),
                           ),
                         ],
+                      ),
+                    ],
+                  ),
+
+                // For modified status - only show message button
+                if (status == 'modified')
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            final userName = user['name'] ?? 'Customer';
+                            final userImage = profileImageUrl ?? profileImageBytes;
+                            _controller.openOrCreateChat(
+                              userEmail: userEmail!,
+                              userName: userName,
+                              userImage: userImage,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.infoColor,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          icon: Icon(Icons.message, size: 20),
+                          label: Text('Message Customer', style: TextStyle(fontWeight: FontWeight.w600)),
+                        ),
                       ),
                     ],
                   ),

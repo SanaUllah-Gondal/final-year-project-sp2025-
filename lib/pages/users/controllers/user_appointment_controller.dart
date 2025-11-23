@@ -7,10 +7,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:plumber_project/services/api_service.dart';
 import 'package:plumber_project/widgets/app_color.dart';
 import 'package:plumber_project/notification/send_notification.dart';
-
 import '../../../services/stripe.dart';
 import '../../chat_screen.dart';
-
 
 class UserAppointmentsController extends GetxController {
   final ApiService _apiService = Get.find();
@@ -27,6 +25,8 @@ class UserAppointmentsController extends GetxController {
 
   // Cache for Firebase provider data
   final Map<String, Map<String, dynamic>> _providerCache = {};
+  final Map<String, Map<String, dynamic>> _ratingsCache = {};
+  final Map<String, Map<String, dynamic>> _reviewsCache = {};
 
   @override
   void onInit() {
@@ -38,7 +38,6 @@ class UserAppointmentsController extends GetxController {
     try {
       isLoading.value = true;
 
-      // Load appointments from all service types
       final List<Future> futures = [
         _apiService.getCleanerAppointments(),
         _apiService.getPlumberAppointments(),
@@ -47,24 +46,17 @@ class UserAppointmentsController extends GetxController {
 
       final results = await Future.wait(futures);
 
-      // Combine all appointments
       List<dynamic> allAppointments = [];
       for (var result in results) {
         if (result['success'] && result['data'] != null) {
           final appointmentsData = result['data']['data'] ?? [];
           final serviceType = _getServiceTypeFromResult(result);
-
-          // Enhance appointments with Firebase data
           final enhancedAppointments = await _enhanceAppointmentsWithFirebaseData(
-              appointmentsData,
-              serviceType
-          );
-
+              appointmentsData, serviceType);
           allAppointments.addAll(enhancedAppointments);
         }
       }
 
-      // Sort by date (newest first)
       allAppointments.sort((a, b) {
         final dateA = DateTime.parse(a['appointment_date']);
         final dateB = DateTime.parse(b['appointment_date']);
@@ -72,6 +64,7 @@ class UserAppointmentsController extends GetxController {
       });
 
       appointments.value = allAppointments;
+      await _loadRatingsAndReviews();
       filterAppointments();
 
     } catch (e) {
@@ -81,6 +74,169 @@ class UserAppointmentsController extends GetxController {
       isLoading.value = false;
     }
   }
+
+  Future<void> _loadRatingsAndReviews() async {
+    try {
+      final completedAppointments = appointments.where((appt) =>
+      appt['status'] == 'completed').toList();
+
+      for (var appointment in completedAppointments) {
+        final appointmentId = appointment['id'].toString();
+        await _fetchRatingAndReview(appointmentId);
+      }
+    } catch (e) {
+      print('Error loading ratings and reviews: $e');
+    }
+  }
+
+  Future<void> _fetchRatingAndReview(String appointmentId) async {
+    try {
+      final ratingQuery = await _firestore
+          .collection('ratings')
+          .where('appointment_id', isEqualTo: appointmentId)
+          .limit(1)
+          .get();
+
+      if (ratingQuery.docs.isNotEmpty) {
+        _ratingsCache[appointmentId] = _convertDynamicMap(ratingQuery.docs.first.data());
+      }
+
+      final reviewQuery = await _firestore
+          .collection('reviews')
+          .where('appointment_id', isEqualTo: appointmentId)
+          .limit(1)
+          .get();
+
+      if (reviewQuery.docs.isNotEmpty) {
+        _reviewsCache[appointmentId] = _convertDynamicMap(reviewQuery.docs.first.data());
+      }
+    } catch (e) {
+      debugPrint('Error fetching rating and review: $e');
+    }
+  }
+
+  // Check if user has already rated this appointment
+  bool hasUserRated(String appointmentId) {
+    return _ratingsCache.containsKey(appointmentId);
+  }
+
+  // Check if user has already reviewed this appointment
+  bool hasUserReviewed(String appointmentId) {
+    return _reviewsCache.containsKey(appointmentId);
+  }
+
+  // Get rating for an appointment
+  Map<String, dynamic>? getRating(String appointmentId) {
+    return _ratingsCache[appointmentId];
+  }
+
+  // Get review for an appointment
+  Map<String, dynamic>? getReview(String appointmentId) {
+    return _reviewsCache[appointmentId];
+  }
+
+  // Check if appointment has any rating (for display)
+  bool hasRating(String appointmentId) {
+    return _ratingsCache.containsKey(appointmentId);
+  }
+
+  // Check if appointment has any review (for display)
+  bool hasReview(String appointmentId) {
+    return _reviewsCache.containsKey(appointmentId);
+  }
+
+  // Submit rating and review
+  Future<void> submitRatingReview({
+    required String appointmentId,
+    required String providerId,
+    required String providerName,
+    required String serviceType,
+    required double rating,
+    required String review,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      final userEmail = user.email!;
+
+      // 🔥 Get user name from Firestore
+      final userQuery = await FirebaseFirestore.instance
+          .collection('user')
+          .where('email', isEqualTo: userEmail)
+          .limit(1)
+          .get();
+
+      String userName = "Unknown User";
+      if (userQuery.docs.isNotEmpty) {
+        userName = userQuery.docs.first['fullName'] ?? "Unknown User";
+      }
+
+      // Check if already rated
+      if (hasUserRated(appointmentId)) {
+        Get.snackbar(
+          'Already Rated',
+          'You have already rated this appointment',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.warningColor,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      // Save rating
+      if (rating > 0) {
+        await _firestore.collection('ratings').doc('$appointmentId-$userEmail').set({
+          'appointment_id': appointmentId,
+          'provider_id': providerId,
+          'provider_name': providerName.isNotEmpty ? providerName : "Name",
+          'user_email': userEmail,
+          'user_name': userName, // 🔥 fixed
+          'rating': rating,
+          'service_type': serviceType.toLowerCase(),
+          'created_at': FieldValue.serverTimestamp(),
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Save review
+      if (review.isNotEmpty) {
+        await _firestore.collection('reviews').doc('$appointmentId-$userEmail').set({
+          'appointment_id': appointmentId,
+          'provider_id': providerId,
+          'provider_name': providerName.isNotEmpty ? providerName : "Name",
+          'user_email': userEmail,
+          'user_name': userName, // 🔥 fixed
+          'review': review,
+          'service_type': serviceType.toLowerCase(),
+          'created_at': FieldValue.serverTimestamp(),
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Update cache
+      await _fetchRatingAndReview(appointmentId);
+      update();
+
+      Get.snackbar(
+        'Success',
+        'Rating & Review submitted successfully!',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.successColor,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to submit rating & review: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        colorText: Colors.white,
+      );
+      rethrow;
+    }
+  }
+
   Future<void> openOrCreateChat({
     required String providerEmail,
     required String providerName,
@@ -96,7 +252,6 @@ class UserAppointmentsController extends GetxController {
       final userEmail = user.email!;
       final userName = user.displayName ?? 'User';
 
-      // Just create the chat documents and navigate
       await _firestore
           .collection('messages')
           .doc(userEmail)
@@ -125,7 +280,6 @@ class UserAppointmentsController extends GetxController {
         'isOnline': false,
       }, SetOptions(merge: true));
 
-      // Navigate to chat screen
       Get.to(
             () => ChatScreen(
           otherUserEmail: providerEmail,
@@ -145,46 +299,82 @@ class UserAppointmentsController extends GetxController {
       );
     }
   }
+
+  // Add this method to safely convert dynamic maps
+  Map<String, dynamic> _convertDynamicMap(Map<dynamic, dynamic> dynamicMap) {
+    final Map<String, dynamic> convertedMap = {};
+    dynamicMap.forEach((key, value) {
+      if (value is Map<dynamic, dynamic>) {
+        convertedMap[key.toString()] = _convertDynamicMap(value);
+      } else {
+        convertedMap[key.toString()] = value;
+      }
+    });
+    return convertedMap;
+  }
+
+// Updated enhancement method
   Future<List<dynamic>> _enhanceAppointmentsWithFirebaseData(
-      List<dynamic> appointments,
-      String serviceType
-      ) async {
+      List<dynamic> appointments, String serviceType) async {
     final enhancedAppointments = <dynamic>[];
 
     for (var appointment in appointments) {
       try {
-        // Add service type
-        appointment['service_type'] = serviceType;
+        // Convert the entire appointment to string map first
+        Map<String, dynamic> convertedAppointment;
+        if (appointment is Map<dynamic, dynamic>) {
+          convertedAppointment = _convertDynamicMap(appointment);
+        } else if (appointment is Map<String, dynamic>) {
+          convertedAppointment = appointment;
+        } else {
+          convertedAppointment = {'id': appointment.toString()};
+        }
 
-        // Get provider data from Firebase using provider role and email
-        final provider = appointment['provider'];
-        if (provider != null && provider['email'] != null) {
-          final providerEmail = provider['email'];
-          final providerRole = provider['role']; // electrician, plumber, cleaner
+        convertedAppointment['service_type'] = serviceType;
+        final provider = convertedAppointment['provider'];
 
-          // Get provider data from Firebase based on their role
-          final providerData = await _getProviderDataFromFirebase(providerEmail, providerRole);
-
-          if (providerData != null) {
-            // Merge Firebase data with API provider data
-            appointment['provider'] = {
-              ...provider, // Keep original provider data
-              'phone_number': providerData['contactNumber'] ?? providerData['phone_number'] ?? 'Not available',
-              'profile_image': providerData['profileImage'] ?? providerData['profile_image'],
-              'firebase_uid':provider['email'] , // Add Firebase document ID for chat
-            };
+        if (provider != null && provider is Map) {
+          // Convert provider to string map
+          Map<String, dynamic> convertedProvider;
+          if (provider is Map<dynamic, dynamic>) {
+            convertedProvider = _convertDynamicMap(provider);
           } else {
-            // Fallback to API provider data only
-            appointment['provider'] = {
-              ...provider,
+            convertedProvider = Map<String, dynamic>.from(provider);
+          }
+
+          final providerEmail = convertedProvider['email']?.toString();
+          final providerRole = convertedProvider['role']?.toString();
+
+          if (providerEmail != null) {
+            final providerData = await _getProviderDataFromFirebase(providerEmail, providerRole ?? '');
+
+            if (providerData != null) {
+              convertedAppointment['provider'] = {
+                ...convertedProvider,
+                'phone_number': providerData['contactNumber'] ?? providerData['phone_number'] ?? providerEmail,
+                'profile_image': providerData['profileImage'] ?? providerData['profile_image'],
+                'firebase_uid': providerEmail,
+              };
+            } else {
+              // Use basic provider data from API
+              convertedAppointment['provider'] = {
+                ...convertedProvider,
+                'phone_number': providerEmail,
+                'profile_image': null,
+                'firebase_uid': providerEmail,
+              };
+            }
+          } else {
+            convertedAppointment['provider'] = {
+              ...convertedProvider,
               'phone_number': 'Not available',
               'profile_image': null,
               'firebase_uid': null,
             };
           }
         } else {
-          // No provider data in API response
-          appointment['provider'] = {
+          // Handle case where provider data is missing
+          convertedAppointment['provider'] = {
             'name': 'Unknown Provider',
             'email': 'Not available',
             'role': 'unknown',
@@ -194,39 +384,48 @@ class UserAppointmentsController extends GetxController {
           };
         }
 
-        // Get problem image from API (it's already in the response)
-        final problemImage = appointment['problem_image'];
-        if (problemImage != null) {
-          // Convert relative path to full URL if needed
-          appointment['problem_image_url'] = _getFullImageUrl(problemImage);
-        }
-
-        enhancedAppointments.add(appointment);
+        enhancedAppointments.add(convertedAppointment);
       } catch (e) {
         print('Error enhancing appointment: $e');
-        // Add basic appointment data even if enhancement fails
-        appointment['service_type'] = serviceType;
-        final provider = appointment['provider'] ?? {};
-        appointment['provider'] = {
-          'name': provider['name'] ?? 'Unknown Provider',
-          'email': provider['email'] ?? 'Not available',
-          'role': provider['role'] ?? 'unknown',
-          'phone_number': 'Not available',
+        // Provide fallback data with safe conversion
+        Map<String, dynamic> fallbackAppointment;
+        if (appointment is Map<dynamic, dynamic>) {
+          fallbackAppointment = _convertDynamicMap(appointment);
+        } else if (appointment is Map<String, dynamic>) {
+          fallbackAppointment = appointment;
+        } else {
+          fallbackAppointment = {'id': appointment.toString()};
+        }
+
+        fallbackAppointment['service_type'] = serviceType;
+        final provider = fallbackAppointment['provider'] ?? {};
+
+        Map<String, dynamic> convertedProvider;
+        if (provider is Map<dynamic, dynamic>) {
+          convertedProvider = _convertDynamicMap(provider);
+        } else if (provider is Map<String, dynamic>) {
+          convertedProvider = provider;
+        } else {
+          convertedProvider = {};
+        }
+
+        fallbackAppointment['provider'] = {
+          'name': convertedProvider['name'] ?? 'Unknown Provider',
+          'email': convertedProvider['email'] ?? 'Not available',
+          'role': convertedProvider['role'] ?? 'unknown',
+          'phone_number': convertedProvider['email'] ?? 'Not available',
           'profile_image': null,
-          'firebase_uid': null,
+          'firebase_uid': convertedProvider['email'],
         };
-        enhancedAppointments.add(appointment);
+        enhancedAppointments.add(fallbackAppointment);
       }
     }
 
     return enhancedAppointments;
   }
 
-  Future<Map<String, dynamic>?> _getProviderDataFromFirebase(
-      String email,
-      String role
-      ) async {
-    // Check cache first
+
+  Future<Map<String, dynamic>?> _getProviderDataFromFirebase(String email, String role) async {
     final cacheKey = '$email-$role';
     if (_providerCache.containsKey(cacheKey)) {
       return _providerCache[cacheKey];
@@ -234,9 +433,6 @@ class UserAppointmentsController extends GetxController {
 
     try {
       String collectionName = _getFirebaseCollectionName(role);
-
-      print('Fetching provider data from Firebase: collection=$collectionName, email=$email');
-
       final querySnapshot = await FirebaseFirestore.instance
           .collection(collectionName)
           .where('email', isEqualTo: email)
@@ -244,17 +440,10 @@ class UserAppointmentsController extends GetxController {
           .get();
 
       if (querySnapshot.docs.isNotEmpty) {
-        final doc = querySnapshot.docs.first;
-        final data = doc.data();
-
-        print('Found provider data in Firebase: $data');
-
-        // Cache the provider data
-        _providerCache[cacheKey] = data;
-
-        return data;
-      } else {
-        print('No provider found in Firebase for email: $email in collection: $collectionName');
+        final data = querySnapshot.docs.first.data();
+        final convertedData = _convertDynamicMap(data);
+        _providerCache[cacheKey] = convertedData;
+        return convertedData;
       }
     } catch (e) {
       print('Error fetching provider data from Firebase: $e');
@@ -262,6 +451,8 @@ class UserAppointmentsController extends GetxController {
 
     return null;
   }
+
+
 
   String _getServiceTypeFromResult(Map<String, dynamic> result) {
     final url = result['request_url']?.toString() ?? '';
@@ -273,34 +464,23 @@ class UserAppointmentsController extends GetxController {
 
   String _getFirebaseCollectionName(String role) {
     switch (role.toLowerCase()) {
-      case 'electrician':
-        return 'electrician';
-      case 'plumber':
-        return 'plumber';
-      case 'cleaner':
-        return 'cleaner';
-      case 'user':
-        return 'user';
-      default:
-        return role.toLowerCase() + 's';
+      case 'electrician': return 'electrician';
+      case 'plumber': return 'plumber';
+      case 'cleaner': return 'cleaner';
+      case 'user': return 'user';
+      default: return role.toLowerCase() + 's';
     }
   }
 
   String _getFullImageUrl(String imagePath) {
-    if (imagePath.startsWith('http')) {
-      return imagePath;
-    } else {
-      // Replace with your actual base URL
-      return 'http://192.168.100.26:8000/storage/$imagePath';
-    }
+    if (imagePath.startsWith('http')) return imagePath;
+    return 'http://192.168.100.26:8000/storage/$imagePath';
   }
 
   void filterAppointments() {
     if (selectedTab.value == 0) {
-      // Show all appointments
       filteredAppointments.value = appointments;
     } else {
-      // Filter by status
       final status = tabs[selectedTab.value].toLowerCase();
       filteredAppointments.value = appointments.where((appt) =>
       appt['status'] == status).toList();
@@ -310,56 +490,34 @@ class UserAppointmentsController extends GetxController {
   Future<void> cancelAppointment(String appointmentId, String serviceType) async {
     try {
       isLoading.value = true;
-      print('Cancelling appointment: $appointmentId, service: $serviceType');
-
-      // Use the updateAppointmentStatus API with 'cancelled' status
       final response = await _apiService.updateAppointmentStatus(
-        serviceType.toLowerCase(),
-        appointmentId,
-        'cancelled',
-      );
+          serviceType.toLowerCase(), appointmentId, 'cancelled');
 
       if (response['success']) {
-        // Get appointment details for notification
         final appointment = _findAppointmentById(appointmentId);
         if (appointment != null) {
-          // Send notification to provider (non-blocking)
           _sendStatusUpdateNotification(
-            appointment: appointment,
-            newStatus: 'cancelled',
-            serviceType: serviceType,
-          );
+              appointment: appointment, newStatus: 'cancelled', serviceType: serviceType);
         }
 
-        Get.snackbar(
-          'Success',
-          'Appointment cancelled successfully',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: AppColors.successColor,
-          colorText: Colors.white,
-        );
-        await loadUserAppointments(); // Refresh the list
+        Get.snackbar('Success', 'Appointment cancelled successfully',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: AppColors.successColor, colorText: Colors.white);
+        await loadUserAppointments();
       } else {
-        Get.snackbar(
-          'Error',
-          response['message'] ?? 'Failed to cancel appointment',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: AppColors.errorColor,
-          colorText: Colors.white,
-        );
+        Get.snackbar('Error', response['message'] ?? 'Failed to cancel appointment',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: AppColors.errorColor, colorText: Colors.white);
       }
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to cancel appointment: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.errorColor,
-        colorText: Colors.white,
-      );
+      Get.snackbar('Error', 'Failed to cancel appointment: $e',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.errorColor, colorText: Colors.white);
     } finally {
       isLoading.value = false;
     }
   }
+
   Future<void> confirmModifiedAppointment(String appointmentId, String serviceType) async {
     try {
       isLoading.value = true;
@@ -490,6 +648,7 @@ class UserAppointmentsController extends GetxController {
       isProcessingPayment.value = false;
     }
   }
+
   Future<bool> _processStripePayment(double amount) async {
     try {
       print('🔄 Starting Stripe payment process for amount: $amount');
@@ -682,6 +841,7 @@ class UserAppointmentsController extends GetxController {
       // Don't rethrow - notification failure shouldn't block the main flow
     }
   }
+
 
   // Get provider device token from Firebase
   Future<String?> _getProviderDeviceToken(String? providerId, String? providerEmail) async {
