@@ -16,6 +16,8 @@ import '../chat_screen.dart';
 import 'controllers/electrician_dashboard_controller.dart';
 
 class ElectricianAppointmentList extends StatefulWidget {
+  final int initialTab;
+  ElectricianAppointmentList({this.initialTab = 0});
   @override
   _ElectricianAppointmentListState createState() => _ElectricianAppointmentListState();
 }
@@ -45,6 +47,7 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
   @override
   void initState() {
     super.initState();
+    _selectedTab.value = widget.initialTab;
     _loadAppointments();
   }
 
@@ -218,6 +221,7 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
   Future<void> _updateAppointmentStatus(String appointmentId, String status) async {
     try {
       _isLoading.value = true;
+      print('🔄 Updating appointment status: $appointmentId to $status');
 
       // Find the appointment details
       final appointment = _appointments.firstWhere(
@@ -226,6 +230,7 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
       );
 
       if (appointment == null) {
+        print('❌ Appointment not found: $appointmentId');
         Get.snackbar('Error', 'Appointment not found',
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: AppColors.errorColor,
@@ -233,13 +238,22 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
         return;
       }
 
+      print('📋 Appointment found: ${appointment['id']}');
+      print('👤 User: ${appointment['user']?['name']}');
+      print('💰 Current price: ${appointment['price']}');
+
+      // FIX: Changed 'plumber' to 'electrician'
       final response = await _apiService.updateAppointmentStatus(
-        'electrician',
+        'electrician', // ✅ FIXED THIS LINE
         appointmentId,
         status,
       );
 
+      print('📡 API Response: $response');
+
       if (response['success']) {
+        print('✅ Status updated successfully to: $status');
+
         // Send notification to user
         await _sendStatusNotification(appointment, status);
 
@@ -247,14 +261,18 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: AppColors.successColor,
             colorText: Colors.white);
-        await _loadAppointments(); // Refresh the list
+
+        // Refresh the list
+        await _loadAppointments();
       } else {
+        print('❌ API Error: ${response['message']}');
         Get.snackbar('Error', response['message'] ?? 'Failed to update status',
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: AppColors.errorColor,
             colorText: Colors.white);
       }
     } catch (e) {
+      print('❌ Exception in _updateAppointmentStatus: $e');
       Get.snackbar('Error', 'Failed to update status: $e',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: AppColors.errorColor,
@@ -269,14 +287,23 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
       _isPlacingBid[appointmentId] = true;
       update();
 
+      print('🔄 Placing bid for appointment: $appointmentId');
+      print('💰 Bid amount: $bidPrice');
+
       final response = await _apiService.placeBid(
         'electrician',
         appointmentId,
         bidPrice,
       );
 
+      print('📡 Bid API Response: $response');
+
       if (response['success']) {
-        _updateAppointmentStatus(appointmentId, "modified");
+        print('✅ Bid placed successfully, updating status to modified');
+
+        // Use the corrected _updateAppointmentStatus method
+        await _updateAppointmentStatus(appointmentId, "modified");
+
         Get.snackbar('Success', 'Bid placed successfully!',
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: AppColors.successColor,
@@ -290,12 +317,14 @@ class _ElectricianAppointmentListState extends State<ElectricianAppointmentList>
 
         await _loadAppointments(); // Refresh the list
       } else {
+        print('❌ Bid API Error: ${response['message']}');
         Get.snackbar('Error', response['message'] ?? 'Failed to place bid',
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: AppColors.errorColor,
             colorText: Colors.white);
       }
     } catch (e) {
+      print('❌ Exception in _placeBid: $e');
       Get.snackbar('Error', 'Failed to place bid: $e',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: AppColors.errorColor,

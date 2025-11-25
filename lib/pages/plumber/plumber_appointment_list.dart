@@ -956,7 +956,7 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
                             child: OutlinedButton.icon(
                               onPressed: () {
                                 final userName = user['name'] ?? 'Customer';
-                                final userImage = profileImageUrl ?? profileImageBytes;
+                                final userImage = profileImageUrl;
                                 _controller.openOrCreateChat(
                                   userEmail: userEmail!,
                                   userName: userName,
@@ -990,11 +990,11 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             final userName = user['name'] ?? 'Customer';
-                            final userImage = profileImageUrl ?? profileImageBytes;
+                            final userImage = profileImageUrl;
                             _controller.openOrCreateChat(
                               userEmail: userEmail!,
                               userName: userName,
-                              userImage: userImage,
+                                userImage: userImage is Uint8List ? null : userImage
                             );
                           },
                           style: ElevatedButton.styleFrom(
@@ -1019,7 +1019,7 @@ class _PlumberAppointmentListState extends State<PlumberAppointmentList> {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             final userName = user['name'] ?? 'Customer';
-                            final userImage = profileImageUrl ?? profileImageBytes;
+                            final userImage = profileImageUrl;
                             _controller.openOrCreateChat(
                               userEmail: userEmail!,
                               userName: userName,

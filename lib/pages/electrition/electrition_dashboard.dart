@@ -262,7 +262,7 @@ class ElectricianHomeContent extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => ElectricianAppointmentList()),
+                        MaterialPageRoute(builder: (context) => ElectricianAppointmentList(initialTab: 0)),
                       );
                     },
                     showBadge: _controller.hasPendingRequests.value,
@@ -273,15 +273,21 @@ class ElectricianHomeContent extends StatelessWidget {
                     icon: Icons.work,
                     gradientColors: [Color(0xFF56CCF2), Color(0xFF2F80ED)],
                     onTap: () {
-                      _controller.updateWorkingStatus(true);
-                    },
+                      Navigator.push(
+                          context,
+                      MaterialPageRoute(builder: (context) => ElectricianAppointmentList(initialTab: 1,)),
+                      );
+                          },
                   ),
                   ElectricianDashboardCard(
                     title: "Completed Jobs",
                     icon: Icons.check_circle,
                     gradientColors: [Color(0xFF76B852), Color(0xFF8DC26F)],
                     onTap: () {
-                      _controller.updateWorkingStatus(false);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ElectricianAppointmentList(initialTab: 3,)),
+                      );
                     },
                   ),
                   ElectricianDashboardCard(

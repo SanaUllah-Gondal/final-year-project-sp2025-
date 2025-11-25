@@ -82,70 +82,108 @@ class UserAppointmentsController extends GetxController {
 
       for (var appointment in completedAppointments) {
         final appointmentId = appointment['id'].toString();
-        await _fetchRatingAndReview(appointmentId);
+        final serviceType = appointment['provider']?['role']?.toString().toLowerCase() ?? 'unknown';
+        await _fetchRatingAndReview(appointmentId, serviceType);
       }
     } catch (e) {
       print('Error loading ratings and reviews: $e');
     }
   }
 
-  Future<void> _fetchRatingAndReview(String appointmentId) async {
+  Future<void> _fetchRatingAndReview(String appointmentId, String serviceType) async {
     try {
-      final ratingQuery = await _firestore
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      final userEmail = user.email!;
+      final compositeKey = '$appointmentId-${serviceType.toLowerCase()}-$userEmail';
+
+      // FIXED: Check all ratings and find if any matches appointment_id and service_type
+      final ratingsQuery = await _firestore
           .collection('ratings')
           .where('appointment_id', isEqualTo: appointmentId)
+          .where('service_type', isEqualTo: serviceType.toLowerCase())
+          .where('user_email', isEqualTo: userEmail)
           .limit(1)
           .get();
 
-      if (ratingQuery.docs.isNotEmpty) {
-        _ratingsCache[appointmentId] = _convertDynamicMap(ratingQuery.docs.first.data());
+      if (ratingsQuery.docs.isNotEmpty) {
+        _ratingsCache[compositeKey] = _convertDynamicMap(ratingsQuery.docs.first.data());
+        print('✅ Found rating for appointment $appointmentId and service $serviceType by user $userEmail');
+      } else {
+        _ratingsCache.remove(compositeKey);
+        print('❌ No rating found for appointment $appointmentId and service $serviceType by user $userEmail');
       }
 
-      final reviewQuery = await _firestore
+      // FIXED: Check all reviews and find if any matches appointment_id and service_type
+      final reviewsQuery = await _firestore
           .collection('reviews')
           .where('appointment_id', isEqualTo: appointmentId)
+          .where('service_type', isEqualTo: serviceType.toLowerCase())
+          .where('user_email', isEqualTo: userEmail)
           .limit(1)
           .get();
 
-      if (reviewQuery.docs.isNotEmpty) {
-        _reviewsCache[appointmentId] = _convertDynamicMap(reviewQuery.docs.first.data());
+      if (reviewsQuery.docs.isNotEmpty) {
+        _reviewsCache[compositeKey] = _convertDynamicMap(reviewsQuery.docs.first.data());
+        print('✅ Found review for appointment $appointmentId and service $serviceType by user $userEmail');
+      } else {
+        _reviewsCache.remove(compositeKey);
+        print('❌ No review found for appointment $appointmentId and service $serviceType by user $userEmail');
       }
     } catch (e) {
       debugPrint('Error fetching rating and review: $e');
     }
   }
 
-  // Check if user has already rated this appointment
-  bool hasUserRated(String appointmentId) {
-    return _ratingsCache.containsKey(appointmentId);
+  // Generate composite key for cache
+  String _getCompositeKey(String appointmentId, String serviceType) {
+    final user = _auth.currentUser;
+    final userEmail = user?.email ?? 'unknown';
+    return '$appointmentId-${serviceType.toLowerCase()}-$userEmail';
   }
 
-  // Check if user has already reviewed this appointment
-  bool hasUserReviewed(String appointmentId) {
-    return _reviewsCache.containsKey(appointmentId);
+  // Check if user has already rated this appointment - FIXED
+  bool hasUserRated(String appointmentId, String serviceType) {
+    final compositeKey = _getCompositeKey(appointmentId, serviceType);
+    final hasRating = _ratingsCache.containsKey(compositeKey);
+    print('🔍 Checking rating for $compositeKey: $hasRating');
+    return hasRating;
+  }
+
+  // Check if user has already reviewed this appointment - FIXED
+  bool hasUserReviewed(String appointmentId, String serviceType) {
+    final compositeKey = _getCompositeKey(appointmentId, serviceType);
+    final hasReview = _reviewsCache.containsKey(compositeKey);
+    print('🔍 Checking review for $compositeKey: $hasReview');
+    return hasReview;
   }
 
   // Get rating for an appointment
-  Map<String, dynamic>? getRating(String appointmentId) {
-    return _ratingsCache[appointmentId];
+  Map<String, dynamic>? getRating(String appointmentId, String serviceType) {
+    final compositeKey = _getCompositeKey(appointmentId, serviceType);
+    return _ratingsCache[compositeKey];
   }
 
   // Get review for an appointment
-  Map<String, dynamic>? getReview(String appointmentId) {
-    return _reviewsCache[appointmentId];
+  Map<String, dynamic>? getReview(String appointmentId, String serviceType) {
+    final compositeKey = _getCompositeKey(appointmentId, serviceType);
+    return _reviewsCache[compositeKey];
   }
 
   // Check if appointment has any rating (for display)
-  bool hasRating(String appointmentId) {
-    return _ratingsCache.containsKey(appointmentId);
+  bool hasRating(String appointmentId, String serviceType) {
+    final compositeKey = _getCompositeKey(appointmentId, serviceType);
+    return _ratingsCache.containsKey(compositeKey);
   }
 
   // Check if appointment has any review (for display)
-  bool hasReview(String appointmentId) {
-    return _reviewsCache.containsKey(appointmentId);
+  bool hasReview(String appointmentId, String serviceType) {
+    final compositeKey = _getCompositeKey(appointmentId, serviceType);
+    return _reviewsCache.containsKey(compositeKey);
   }
 
-  // Submit rating and review
+  // Submit rating and review - FIXED with proper validation
   Future<void> submitRatingReview({
     required String appointmentId,
     required String providerId,
@@ -160,7 +198,7 @@ class UserAppointmentsController extends GetxController {
 
       final userEmail = user.email!;
 
-      // 🔥 Get user name from Firestore
+      // Get user name from Firestore
       final userQuery = await FirebaseFirestore.instance
           .collection('user')
           .where('email', isEqualTo: userEmail)
@@ -172,8 +210,16 @@ class UserAppointmentsController extends GetxController {
         userName = userQuery.docs.first['fullName'] ?? "Unknown User";
       }
 
-      // Check if already rated
-      if (hasUserRated(appointmentId)) {
+      // DOUBLE CHECK: Verify with Firestore directly
+      final existingRatingQuery = await _firestore
+          .collection('ratings')
+          .where('appointment_id', isEqualTo: appointmentId)
+          .where('service_type', isEqualTo: serviceType.toLowerCase())
+          .where('user_email', isEqualTo: userEmail)
+          .limit(1)
+          .get();
+
+      if (existingRatingQuery.docs.isNotEmpty) {
         Get.snackbar(
           'Already Rated',
           'You have already rated this appointment',
@@ -184,38 +230,42 @@ class UserAppointmentsController extends GetxController {
         return;
       }
 
+      final compositeKey = _getCompositeKey(appointmentId, serviceType);
+
       // Save rating
       if (rating > 0) {
-        await _firestore.collection('ratings').doc('$appointmentId-$userEmail').set({
+        await _firestore.collection('ratings').doc(compositeKey).set({
           'appointment_id': appointmentId,
           'provider_id': providerId,
-          'provider_name': providerName.isNotEmpty ? providerName : "Name",
+          'provider_name': providerName.isNotEmpty ? providerName : "Unknown Provider",
           'user_email': userEmail,
-          'user_name': userName, // 🔥 fixed
+          'user_name': userName,
           'rating': rating,
           'service_type': serviceType.toLowerCase(),
           'created_at': FieldValue.serverTimestamp(),
           'updated_at': FieldValue.serverTimestamp(),
         });
+        print('✅ Rating saved for appointment $appointmentId');
       }
 
       // Save review
       if (review.isNotEmpty) {
-        await _firestore.collection('reviews').doc('$appointmentId-$userEmail').set({
+        await _firestore.collection('reviews').doc(compositeKey).set({
           'appointment_id': appointmentId,
           'provider_id': providerId,
-          'provider_name': providerName.isNotEmpty ? providerName : "Name",
+          'provider_name': providerName.isNotEmpty ? providerName : "Unknown Provider",
           'user_email': userEmail,
-          'user_name': userName, // 🔥 fixed
+          'user_name': userName,
           'review': review,
           'service_type': serviceType.toLowerCase(),
           'created_at': FieldValue.serverTimestamp(),
           'updated_at': FieldValue.serverTimestamp(),
         });
+        print('✅ Review saved for appointment $appointmentId');
       }
 
-      // Update cache
-      await _fetchRatingAndReview(appointmentId);
+      // Update cache immediately
+      await _fetchRatingAndReview(appointmentId, serviceType);
       update();
 
       Get.snackbar(
@@ -237,6 +287,238 @@ class UserAppointmentsController extends GetxController {
     }
   }
 
+  // Update existing rating and review
+  Future<void> updateRatingReview({
+    required String appointmentId,
+    required String serviceType,
+    required double rating,
+    required String review,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      final userEmail = user.email!;
+      final compositeKey = _getCompositeKey(appointmentId, serviceType);
+
+      // Update rating
+      if (rating > 0) {
+        await _firestore.collection('ratings').doc(compositeKey).update({
+          'rating': rating,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Update review
+      await _firestore.collection('reviews').doc(compositeKey).update({
+        'review': review,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      // Update cache
+      await _fetchRatingAndReview(appointmentId, serviceType);
+      update();
+
+      Get.snackbar(
+        'Success',
+        'Rating & Review updated successfully!',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.successColor,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to update rating & review: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        colorText: Colors.white,
+      );
+      rethrow;
+    }
+  }
+
+  // Delete rating and review
+  Future<void> deleteRatingReview(String appointmentId, String serviceType) async {
+    try {
+      final compositeKey = _getCompositeKey(appointmentId, serviceType);
+
+      // Delete rating
+      await _firestore.collection('ratings').doc(compositeKey).delete();
+
+      // Delete review
+      await _firestore.collection('reviews').doc(compositeKey).delete();
+
+      // Update cache
+      _ratingsCache.remove(compositeKey);
+      _reviewsCache.remove(compositeKey);
+      update();
+
+      Get.snackbar(
+        'Success',
+        'Rating & Review deleted successfully!',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.successColor,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to delete rating & review: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        colorText: Colors.white,
+      );
+      rethrow;
+    }
+  }
+
+  // Get average rating for a provider
+  Future<double> getProviderAverageRating(String providerId, String serviceType) async {
+    try {
+      final ratingsQuery = await _firestore
+          .collection('ratings')
+          .where('provider_id', isEqualTo: providerId)
+          .where('service_type', isEqualTo: serviceType.toLowerCase())
+          .get();
+
+      if (ratingsQuery.docs.isEmpty) return 0.0;
+
+      double totalRating = 0;
+      for (var doc in ratingsQuery.docs) {
+        final rating = doc['rating'] as double? ?? 0.0;
+        totalRating += rating;
+      }
+
+      return totalRating / ratingsQuery.docs.length;
+    } catch (e) {
+      debugPrint('Error getting provider average rating: $e');
+      return 0.0;
+    }
+  }
+
+  // Get all reviews for a provider
+  Future<List<Map<String, dynamic>>> getProviderReviews(String providerId, String serviceType) async {
+    try {
+      final reviewsQuery = await _firestore
+          .collection('reviews')
+          .where('provider_id', isEqualTo: providerId)
+          .where('service_type', isEqualTo: serviceType.toLowerCase())
+          .orderBy('created_at', descending: true)
+          .get();
+
+      return reviewsQuery.docs.map((doc) => _convertDynamicMap(doc.data())).toList();
+    } catch (e) {
+      debugPrint('Error getting provider reviews: $e');
+      return [];
+    }
+  }
+
+  // Accept modified appointment
+  Future<void> acceptModifiedAppointment(String appointmentId, String serviceType) async {
+    try {
+      isLoading.value = true;
+      print('Accepting modified appointment: $appointmentId, service: $serviceType');
+
+      final response = await _apiService.updateAppointmentStatus(
+        serviceType.toLowerCase(),
+        appointmentId,
+        'confirmed',
+      );
+
+      if (response['success']) {
+        final appointment = _findAppointmentById(appointmentId);
+        if (appointment != null) {
+          _sendStatusUpdateNotification(
+            appointment: appointment,
+            newStatus: 'confirmed',
+            serviceType: serviceType,
+          );
+        }
+
+        Get.snackbar(
+          'Success',
+          'Bid accepted! Appointment confirmed.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.successColor,
+          colorText: Colors.white,
+        );
+        await loadUserAppointments();
+      } else {
+        Get.snackbar(
+          'Error',
+          response['message'] ?? 'Failed to accept bid',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.errorColor,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to accept bid: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Reject modified appointment
+  Future<void> rejectModifiedAppointment(String appointmentId, String serviceType) async {
+    try {
+      isLoading.value = true;
+      print('Rejecting modified appointment: $appointmentId, service: $serviceType');
+
+      final response = await _apiService.updateAppointmentStatus(
+        serviceType.toLowerCase(),
+        appointmentId,
+        'cancelled',
+      );
+
+      if (response['success']) {
+        final appointment = _findAppointmentById(appointmentId);
+        if (appointment != null) {
+          _sendStatusUpdateNotification(
+            appointment: appointment,
+            newStatus: 'cancelled',
+            serviceType: serviceType,
+          );
+        }
+
+        Get.snackbar(
+          'Bid Rejected',
+          'The appointment has been cancelled.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.warningColor,
+          colorText: Colors.white,
+        );
+        await loadUserAppointments();
+      } else {
+        Get.snackbar(
+          'Error',
+          response['message'] ?? 'Failed to reject bid',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.errorColor,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to reject bid: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Open or create chat
   Future<void> openOrCreateChat({
     required String providerEmail,
     required String providerName,
@@ -300,7 +582,7 @@ class UserAppointmentsController extends GetxController {
     }
   }
 
-  // Add this method to safely convert dynamic maps
+  // Convert dynamic map to string map
   Map<String, dynamic> _convertDynamicMap(Map<dynamic, dynamic> dynamicMap) {
     final Map<String, dynamic> convertedMap = {};
     dynamicMap.forEach((key, value) {
@@ -313,14 +595,13 @@ class UserAppointmentsController extends GetxController {
     return convertedMap;
   }
 
-// Updated enhancement method
+  // Enhance appointments with Firebase data
   Future<List<dynamic>> _enhanceAppointmentsWithFirebaseData(
       List<dynamic> appointments, String serviceType) async {
     final enhancedAppointments = <dynamic>[];
 
     for (var appointment in appointments) {
       try {
-        // Convert the entire appointment to string map first
         Map<String, dynamic> convertedAppointment;
         if (appointment is Map<dynamic, dynamic>) {
           convertedAppointment = _convertDynamicMap(appointment);
@@ -334,7 +615,6 @@ class UserAppointmentsController extends GetxController {
         final provider = convertedAppointment['provider'];
 
         if (provider != null && provider is Map) {
-          // Convert provider to string map
           Map<String, dynamic> convertedProvider;
           if (provider is Map<dynamic, dynamic>) {
             convertedProvider = _convertDynamicMap(provider);
@@ -356,7 +636,6 @@ class UserAppointmentsController extends GetxController {
                 'firebase_uid': providerEmail,
               };
             } else {
-              // Use basic provider data from API
               convertedAppointment['provider'] = {
                 ...convertedProvider,
                 'phone_number': providerEmail,
@@ -373,7 +652,6 @@ class UserAppointmentsController extends GetxController {
             };
           }
         } else {
-          // Handle case where provider data is missing
           convertedAppointment['provider'] = {
             'name': 'Unknown Provider',
             'email': 'Not available',
@@ -387,7 +665,6 @@ class UserAppointmentsController extends GetxController {
         enhancedAppointments.add(convertedAppointment);
       } catch (e) {
         print('Error enhancing appointment: $e');
-        // Provide fallback data with safe conversion
         Map<String, dynamic> fallbackAppointment;
         if (appointment is Map<dynamic, dynamic>) {
           fallbackAppointment = _convertDynamicMap(appointment);
@@ -424,7 +701,7 @@ class UserAppointmentsController extends GetxController {
     return enhancedAppointments;
   }
 
-
+  // Get provider data from Firebase
   Future<Map<String, dynamic>?> _getProviderDataFromFirebase(String email, String role) async {
     final cacheKey = '$email-$role';
     if (_providerCache.containsKey(cacheKey)) {
@@ -452,8 +729,7 @@ class UserAppointmentsController extends GetxController {
     return null;
   }
 
-
-
+  // Get service type from result
   String _getServiceTypeFromResult(Map<String, dynamic> result) {
     final url = result['request_url']?.toString() ?? '';
     if (url.contains('cleaner')) return 'Cleaner';
@@ -462,6 +738,7 @@ class UserAppointmentsController extends GetxController {
     return 'Unknown';
   }
 
+  // Get Firebase collection name
   String _getFirebaseCollectionName(String role) {
     switch (role.toLowerCase()) {
       case 'electrician': return 'electrician';
@@ -472,11 +749,7 @@ class UserAppointmentsController extends GetxController {
     }
   }
 
-  String _getFullImageUrl(String imagePath) {
-    if (imagePath.startsWith('http')) return imagePath;
-    return 'http://192.168.100.26:8000/storage/$imagePath';
-  }
-
+  // Filter appointments
   void filterAppointments() {
     if (selectedTab.value == 0) {
       filteredAppointments.value = appointments;
@@ -487,6 +760,7 @@ class UserAppointmentsController extends GetxController {
     }
   }
 
+  // Cancel appointment
   Future<void> cancelAppointment(String appointmentId, String serviceType) async {
     try {
       isLoading.value = true;
@@ -518,60 +792,7 @@ class UserAppointmentsController extends GetxController {
     }
   }
 
-  Future<void> confirmModifiedAppointment(String appointmentId, String serviceType) async {
-    try {
-      isLoading.value = true;
-      print('Cancelling appointment: $appointmentId, service: $serviceType');
-
-      // Use the updateAppointmentStatus API with 'cancelled' status
-      final response = await _apiService.updateAppointmentStatus(
-        serviceType.toLowerCase(),
-        appointmentId,
-        'confirmed',
-      );
-
-      if (response['success']) {
-        // Get appointment details for notification
-        final appointment = _findAppointmentById(appointmentId);
-        if (appointment != null) {
-          // Send notification to provider (non-blocking)
-          _sendStatusUpdateNotification(
-            appointment: appointment,
-            newStatus: 'confirmed',
-            serviceType: serviceType,
-          );
-        }
-
-        Get.snackbar(
-          'Success',
-          'Appointment confirmed successfully',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: AppColors.successColor,
-          colorText: Colors.white,
-        );
-        await loadUserAppointments(); // Refresh the list
-      } else {
-        Get.snackbar(
-          'Error',
-          response['message'] ?? 'Failed to confirmed appointment',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: AppColors.errorColor,
-          colorText: Colors.white,
-        );
-      }
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to confirmed appointment: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.errorColor,
-        colorText: Colors.white,
-      );
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
+  // Complete booking
   Future<void> completeBooking(
       String appointmentId,
       String serviceType,
@@ -582,7 +803,6 @@ class UserAppointmentsController extends GetxController {
       isProcessingPayment.value = true;
       print('Completing booking: $appointmentId, payment: $paymentMethod, amount: $amount');
 
-      // Process payment if online
       bool paymentSuccess = true;
       if (paymentMethod == 'online') {
         paymentSuccess = await _processStripePayment(amount);
@@ -598,7 +818,6 @@ class UserAppointmentsController extends GetxController {
         }
       }
 
-      // Update appointment status to completed with payment method
       final response = await _apiService.updateAppointmentStatus(
         serviceType.toLowerCase(),
         appointmentId,
@@ -606,10 +825,8 @@ class UserAppointmentsController extends GetxController {
       );
 
       if (response['success']) {
-        // Get appointment details for notification
         final appointment = _findAppointmentById(appointmentId);
         if (appointment != null) {
-          // Send notification to provider (non-blocking)
           _sendStatusUpdateNotification(
             appointment: appointment,
             newStatus: 'completed',
@@ -626,7 +843,7 @@ class UserAppointmentsController extends GetxController {
           backgroundColor: AppColors.successColor,
           colorText: Colors.white,
         );
-        await loadUserAppointments(); // Refresh the list
+        await loadUserAppointments();
       } else {
         Get.snackbar(
           'Error',
@@ -649,17 +866,16 @@ class UserAppointmentsController extends GetxController {
     }
   }
 
+  // Process Stripe payment
   Future<bool> _processStripePayment(double amount) async {
     try {
       print('🔄 Starting Stripe payment process for amount: $amount');
 
-      // Test the setup first
       final setupValid = await _stripeService.validateSetup();
       if (!setupValid) {
         throw Exception('Stripe setup validation failed');
       }
 
-      // Process payment
       print('🔄 Processing payment of \$${amount.toStringAsFixed(2)}...');
       final success = await _stripeService.makePayment(amount.toInt());
 
@@ -734,10 +950,9 @@ class UserAppointmentsController extends GetxController {
     }
   }
 
+  // Calculate booking amount
   Future<double> calculateBookingAmount(String appointmentId) async {
     try {
-      // In a real app, you would calculate this from your backend
-      // For now, we'll use the price from the appointment
       final appointment = _findAppointmentById(appointmentId);
       if (appointment != null) {
         final price = appointment['price'];
@@ -756,7 +971,7 @@ class UserAppointmentsController extends GetxController {
     }
   }
 
-  // Helper method to find appointment by ID
+  // Find appointment by ID
   Map<String, dynamic>? _findAppointmentById(String appointmentId) {
     try {
       return appointments.firstWhere(
@@ -768,7 +983,7 @@ class UserAppointmentsController extends GetxController {
     }
   }
 
-  // Send notification to provider about status update
+  // Send status update notification
   Future<void> _sendStatusUpdateNotification({
     required Map<String, dynamic> appointment,
     required String newStatus,
@@ -791,7 +1006,6 @@ class UserAppointmentsController extends GetxController {
         return;
       }
 
-      // Get provider device token
       final providerToken = await _getProviderDeviceToken(providerId, providerEmail);
       if (providerToken == null) {
         print('❌ No provider device token found');
@@ -800,7 +1014,6 @@ class UserAppointmentsController extends GetxController {
 
       print('📱 Provider token obtained, sending notification...');
 
-      // Prepare notification content based on status
       final statusMessages = {
         'cancelled': {
           'title': '❌ Appointment Cancelled',
@@ -810,6 +1023,10 @@ class UserAppointmentsController extends GetxController {
           'title': '✅ Appointment Completed',
           'body': 'The customer marked the appointment as completed',
         },
+        'confirmed': {
+          'title': '✅ Bid Accepted',
+          'body': 'Customer accepted your bid! Appointment confirmed.',
+        },
       };
 
       final message = statusMessages[newStatus];
@@ -818,7 +1035,6 @@ class UserAppointmentsController extends GetxController {
         return;
       }
 
-      // Prepare notification data
       final notificationData = {
         'screen': 'appointments',
         'appointment_id': appointment['id'].toString(),
@@ -827,7 +1043,6 @@ class UserAppointmentsController extends GetxController {
         'type': 'status_update',
       };
 
-      // Send notification
       await SendNotificationService.sendNotification(
         token: providerToken,
         title: message['title']!,
@@ -838,17 +1053,14 @@ class UserAppointmentsController extends GetxController {
       print('✅ Status update notification sent successfully');
     } catch (e) {
       print('❌ Error sending status update notification: $e');
-      // Don't rethrow - notification failure shouldn't block the main flow
     }
   }
 
-
-  // Get provider device token from Firebase
+  // Get provider device token
   Future<String?> _getProviderDeviceToken(String? providerId, String? providerEmail) async {
     try {
       print('🔍 Looking for provider device token...');
 
-      // Try by email first (most reliable)
       if (providerEmail != null) {
         print('📧 Searching by email: $providerEmail');
         final tokenDoc = await FirebaseFirestore.instance
@@ -865,7 +1077,6 @@ class UserAppointmentsController extends GetxController {
         }
       }
 
-      // Try by user ID
       if (providerId != null) {
         print('🆔 Searching by user ID: $providerId');
         final querySnapshot = await FirebaseFirestore.instance
@@ -883,7 +1094,6 @@ class UserAppointmentsController extends GetxController {
         }
       }
 
-      // Try alternative collections
       final alternativeCollections = ['fcm_tokens', 'device_tokens', 'notifications'];
       for (final collection in alternativeCollections) {
         try {
@@ -914,7 +1124,7 @@ class UserAppointmentsController extends GetxController {
     }
   }
 
-  // Helper method to format price safely
+  // Format price safely
   String formatPrice(dynamic price) {
     if (price == null) return "RPS:0.00";
 
@@ -947,12 +1157,12 @@ class UserAppointmentsController extends GetxController {
       return;
     }
 
-    // Navigate to chat screen with provider details
-    Get.toNamed('/chat', arguments: {
-      'providerId': provider['firebase_uid'],
-      'providerName': provider['name'] ?? 'Provider',
-      'appointmentId': appointment['id'],
-      'serviceType': appointment['service_type'],
-    });
+    Get.to(
+          () => ChatScreen(
+        otherUserEmail: provider['firebase_uid'] ?? provider['email'],
+        otherUserName: provider['name'] ?? 'Provider',
+        otherUserImage: provider['profile_image'],
+      ),
+    );
   }
 }

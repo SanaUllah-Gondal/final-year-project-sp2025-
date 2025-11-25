@@ -198,26 +198,51 @@ class ElectricianDashboardController extends GetxController {
   }
 
   Future<ImageSource?> _showImageSourceDialog() async {
-    return await Get.dialog<ImageSource>(
-      AlertDialog(
-        title: Text('Identity Verification'),
-        content: Text('Please verify your identity to go online. Choose image source:'),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: ImageSource.camera),
-            child: Text('Camera'),
-          ),
-          TextButton(
-            onPressed: () => Get.back(result: ImageSource.gallery),
-            child: Text('Gallery'),
-          ),
-          TextButton(
-            onPressed: () => Get.back(result: null),
-            child: Text('Cancel'),
-          ),
-        ],
-      ),
-    );
+    Completer<ImageSource?> completer = Completer<ImageSource?>();
+
+    try {
+      await Get.dialog(
+        AlertDialog(
+          title: Text('Identity Verification'),
+          content: Text('Please verify your identity to go online. Choose image source:'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Don't use Get.back() here, complete the completer instead
+                if (!completer.isCompleted) {
+                  completer.complete(ImageSource.camera);
+                }
+              },
+              child: Text('Camera'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (!completer.isCompleted) {
+                  completer.complete(ImageSource.gallery);
+                }
+              },
+              child: Text('Gallery'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (!completer.isCompleted) {
+                  completer.complete(null);
+                }
+              },
+              child: Text('Cancel'),
+            ),
+          ],
+        ),
+        barrierDismissible: false, // Prevent dismissing by tapping outside
+      );
+    } catch (e) {
+      debugPrint('Dialog error: $e');
+      if (!completer.isCompleted) {
+        completer.complete(null);
+      }
+    }
+
+    return completer.future;
   }
 
   Future<File?> _captureVerificationImage(ImageSource source) async {

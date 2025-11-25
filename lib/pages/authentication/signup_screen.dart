@@ -1,17 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Add this import for input formatting
 import 'package:plumber_project/pages/Apis.dart';
 import 'package:plumber_project/pages/electrition/electrition_profile.dart';
 import 'package:plumber_project/pages/plumber/plumber_profile.dart';
 import 'package:plumber_project/pages/users/user_profile.dart';
 import 'package:plumber_project/pages/authentication/login.dart';
 import 'package:plumber_project/pages/authentication/otp_page.dart';
-import 'package:plumber_project/pages/cleaner/cleaner_profile.dart'; // Add this import
+import 'package:plumber_project/pages/cleaner/cleaner_profile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -24,20 +26,71 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final Color darkBlue = const Color(0xFF003E6B);
   final Color tealBlue = const Color(0xFF00A8A8);
   final _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _cnicController = TextEditingController();
   String? _selectedRole;
   bool _isLoading = false;
   bool _isOtpVisible = false;
+
+  // CNIC validation for Pakistani CNIC
+  bool _isValidCnic(String cnic) {
+    // Remove any dashes or spaces
+    String cleanCnic = cnic.replaceAll(RegExp(r'[-\s]'), '');
+
+    // Check if it's exactly 13 digits
+    if (cleanCnic.length != 13) return false;
+
+    // Check if all characters are digits
+    if (!RegExp(r'^[0-9]{13}$').hasMatch(cleanCnic)) return false;
+
+    return true;
+  }
+
+  // Check if CNIC already exists in Firestore
+  Future<bool> _isCnicAlreadyTaken(String cnic) async {
+    try {
+      String cleanCnic = cnic.replaceAll(RegExp(r'[-\s]'), '');
+
+      final querySnapshot = await _firestore
+          .collection('cnic')
+          .where('cnic_number', isEqualTo: cleanCnic)
+          .limit(1)
+          .get();
+
+      return querySnapshot.docs.isNotEmpty;
+    } catch (e) {
+      print('Error checking CNIC: $e');
+      return true; // Return true to prevent registration in case of error
+    }
+  }
+
+  // Save CNIC to Firestore
+  Future<void> _saveCnicToFirestore(String cnic, String email) async {
+    try {
+      String cleanCnic = cnic.replaceAll(RegExp(r'[-\s]'), '');
+
+      await _firestore.collection('cnic').add({
+        'cnic_number': cleanCnic,
+        'email': email,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error saving CNIC to Firestore: $e');
+      throw 'Failed to save CNIC information';
+    }
+  }
 
   Future<void> _handleSignUp() async {
     String name = _nameController.text.trim();
     String email = _emailController.text.trim();
     String password = _passwordController.text;
     String confirmPassword = _confirmPasswordController.text;
+    String cnic = _cnicController.text.trim();
 
     // Validation
     if (name.isEmpty) {
@@ -60,6 +113,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
+    if (cnic.isEmpty) {
+      _showAlert('CNIC Required', 'Please enter your CNIC.');
+      return;
+    }
+
+    if (!_isValidCnic(cnic)) {
+      _showAlert('Invalid CNIC', 'Please enter a valid Pakistani CNIC (13 digits without dashes).');
+      return;
+    }
+
     if (_selectedRole == null) {
       _showAlert('Select Role', 'Please select a role.');
       return;
@@ -70,9 +133,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      // First call your Laravel API
+      // First check if CNIC is already taken
+      bool isCnicTaken = await _isCnicAlreadyTaken(cnic);
+      if (isCnicTaken) {
+        _showAlert('CNIC Already Exists', 'This CNIC is already registered. Please use a different CNIC.');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Then call your Laravel API
       final response = await http.post(
-        Uri.parse('$baseUrl/api/register'), // Remove extra slash if baseUrl already has it
+        Uri.parse('$baseUrl/api/register'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -96,6 +167,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
         try {
           await _registerWithEmailAndPassword(email, password);
 
+          // Save CNIC to Firestore
+          await _saveCnicToFirestore(cnic, email);
+
           // Show OTP screen
           setState(() => _isOtpVisible = true);
           Navigator.push(
@@ -118,7 +192,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         if (data['message'] != null) {
           errorMessage = data['message'];
         } else if (data['errors'] != null) {
-          // Handle Laravel validation errors
           final errors = data['errors'];
           if (errors is Map) {
             errorMessage = errors.values.first?.first?.toString() ?? errorMessage;
@@ -219,7 +292,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 28,
-              color: Colors.white // Changed to white for better visibility
+              color: Colors.white
           ),
         ),
         backgroundColor: Colors.transparent,
@@ -251,6 +324,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   const SizedBox(height: 10),
                   _buildLabel("Email"),
                   _buildTextField(_emailController, "Enter your email", Icons.email),
+                  const SizedBox(height: 10),
+                  _buildLabel("CNIC"),
+                  _buildCnicTextField(), // Use the new CNIC-specific text field
                   const SizedBox(height: 10),
                   _buildLabel("Password"),
                   _buildTextField(_passwordController, "Enter your password", Icons.lock,
@@ -344,15 +420,45 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  // Special CNIC text field with digit-only restriction and max length
+  Widget _buildCnicTextField() {
+    return TextField(
+      controller: _cnicController,
+      keyboardType: TextInputType.number,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly, // Only allow digits
+        LengthLimitingTextInputFormatter(13), // Maximum 13 characters
+      ],
+      style: const TextStyle(color: Colors.black),
+      decoration: InputDecoration(
+        hintText: "Enter your CNIC (13 digits)",
+        helperText: "Enter 13-digit CNIC without dashes",
+        helperStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        prefixIcon: Icon(Icons.badge, color: Colors.grey),
+        contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
+        counterText: "", // Remove the default counter
+      ),
+      maxLength: 13, // Set maximum length to 13
+    );
+  }
+
   Widget _buildTextField(
       TextEditingController controller, String hint, IconData icon,
-      {bool obscure = false}) {
+      {bool obscure = false, TextInputType keyboardType = TextInputType.text, String? helperText}) {
     return TextField(
       controller: controller,
       obscureText: obscure,
+      keyboardType: keyboardType,
       style: const TextStyle(color: Colors.black),
       decoration: InputDecoration(
         hintText: hint,
+        helperText: helperText,
+        helperStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(
